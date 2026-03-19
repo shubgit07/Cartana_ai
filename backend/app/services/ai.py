@@ -1,9 +1,10 @@
 import json
 import os
 from groq import Groq
+from app.core.config import settings
 
 def get_client() -> Groq | None:
-    api_key = os.getenv('LLM_API_KEY')
+    api_key = settings.GROQ_API_KEY
     return Groq(api_key=api_key) if api_key else None
 
 def detect_tasks(transcript: str) -> list[str]:
@@ -20,7 +21,7 @@ Transcript:
 """
     try:
         response = client.chat.completions.create(
-            model=os.getenv('LLM_MODEL', 'llama-3.3-70b-versatile'),
+            model=settings.LLM_MODEL,
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"}
         )
@@ -62,7 +63,9 @@ Sentence:
             response_format={"type": "json_object"}
         )
         content = response.choices[0].message.content
-        return json.loads(content)
+        data = json.loads(content)
+        print(f"DEBUG: extract_entities output: {data}")
+        return data
     except Exception as e:
         print(f"Error in extract_entities: {e}")
         return {

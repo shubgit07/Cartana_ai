@@ -1,61 +1,58 @@
-from fastapi import FastAPI, Depends, HTTPException, File, UploadFile, Form
-import os
-import shutil
-from sqlalchemy.orm import Session
-from app.models import database, models, schemas
-from app.workers.worker_main import run_task_pipeline
-from app.core.celery_app import celery_app
+import logging
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.api.routes import router
+from app.models.database import engine, SessionLocal
+from app.models.models import Base, User, RoleEnum
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="VoiceTask AI")
 
-@app.post("/process-input", response_model=schemas.ProcessTextResponse)
-def process_input(
-    user_id: int = Form(...),
-    text: str = Form(None),
-    file: UploadFile = File(None),
-    db: Session = Depends(database.get_db)
-):
-    # Optional: Verify if user exists
-    user = db.query(models.User).filter(models.User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(router)
+
+
+@app.on_event("startup")
+def on_startup():
+    """Create DB tables and ensure default users exist."""
+    logger.info("Running startup: creating database tables...")
+    Base.metadata.create_all(bind=engine)
+    logger.info("Database tables ready.")
+
+    db = SessionLocal()
+    try:
+        # Seed users for Phase 1.5
+        seed_users = [
+            {"username": "Manager", "role": RoleEnum.MANAGER},
+            {"username": "Swati", "role": RoleEnum.EMPLOYEE},
+            {"username": "Shubham", "role": RoleEnum.EMPLOYEE},
+            {"username": "Sid", "role": RoleEnum.EMPLOYEE},
+            {"username": "James", "role": RoleEnum.EMPLOYEE},
+        ]
+
+        for user_data in seed_users:
+            exists = db.query(User).filter(User.username == user_data["username"]).first()
+            if not exists:
+                new_user = User(username=user_data["username"], role=user_data["role"])
+                db.add(new_user)
+                logger.info(f"Seeded user: {user_data['username']} ({user_data['role']})")
         
-    if not text and not file:
-        raise HTTPException(status_code=400, detail="Must provide either text or audio file")
-
-    audio_path = None
-    if file:
-        upload_dir = os.path.join(os.path.dirname(__file__), "..", "uploads")
-        os.makedirs(upload_dir, exist_ok=True)
-        audio_path = os.path.join(upload_dir, file.filename)
-        with open(audio_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-
-    # Create the Note based on raw_text or a placeholder
-    new_note = models.Note(
-        raw_text=text or "Pending Transcription...",
-        status=models.NoteStatus.PENDING,
-        pipeline_trace={}
-    )
-    db.add(new_note)
-    db.commit()
-    db.refresh(new_note)
-    
-    # Run the pipeline asynchronously via Celery
-    task = run_task_pipeline.delay(new_note.id, text=text, audio_path=audio_path)
-    
-    return schemas.ProcessTextResponse(
-        message="Input received and processing started",
-        note_id=new_note.id,
-        status=new_note.status,
-        job_id=task.id
-    )
-
-@app.get("/status/{job_id}")
-def get_task_status(job_id: str):
-    task_result = celery_app.AsyncResult(job_id)
-    return {
-        "job_id": job_id,
-        "status": task_result.status,
-        "result": task_result.result
-    }
+        db.commit()
+    except Exception as e:
+        logger.error(f"Error during startup user creation: {e}")
+        db.rollback()
+    finally:
+        db.close()
