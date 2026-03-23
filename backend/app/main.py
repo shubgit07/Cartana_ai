@@ -1,8 +1,10 @@
 import logging
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api.routes import router
+from app.core.config import settings
 from app.models.database import engine, SessionLocal
 from app.models.models import Base, User, RoleEnum
 
@@ -14,13 +16,41 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="VoiceTask AI")
 
+allowed_origins = settings.cors_allow_origins_list
+if settings.ENVIRONMENT.lower() == "production" and "*" in allowed_origins:
+    logger.warning("CORS_ALLOW_ORIGINS is '*' in production; this is not recommended.")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=allowed_origins,
+    allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def enforce_request_size_limit(request: Request, call_next):
+    """Reject oversized requests early using Content-Length."""
+    max_bytes = settings.MAX_REQUEST_SIZE_MB * 1024 * 1024
+    content_length = request.headers.get("content-length")
+
+    if content_length:
+        try:
+            if int(content_length) > max_bytes:
+                return JSONResponse(
+                    status_code=413,
+                    content={
+                        "detail": f"Request too large. Max allowed size is {settings.MAX_REQUEST_SIZE_MB}MB.",
+                    },
+                )
+        except ValueError:
+            return JSONResponse(
+                status_code=400,
+                content={"detail": "Invalid Content-Length header."},
+            )
+
+    return await call_next(request)
 
 app.include_router(router)
 

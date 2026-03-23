@@ -13,7 +13,8 @@ import {
   LayoutDashboard,
   Users as UsersIcon,
   FolderKanban,
-  Zap
+  Zap,
+  Trash2
 } from 'lucide-react';
 import TaskStatus from './components/TaskStatus';
 import KanbanBoard from './components/KanbanBoard';
@@ -125,6 +126,24 @@ export default function App() {
       fetchTasks(currentUser?.id);
     } catch (error) {
       console.error("Failed to delete task", error);
+    }
+  };
+
+  const handleNoteDelete = async (e, id) => {
+    e.stopPropagation(); // Don't trigger note selection
+    if (!window.confirm("Delete this input from history? (Tasks will remain untouched)")) return;
+    
+    try {
+      await axios.delete(`${API_URL}/notes/${id}`);
+      // Optimistically update UI
+      setNotes(prev => prev.filter(n => n.id !== id));
+      if (selectedNoteId === id) {
+        setSelectedNoteId(null);
+        setPipelineTrace(null);
+        setShowTrace(false);
+      }
+    } catch (error) {
+      console.error("Failed to delete note", error);
     }
   };
 
@@ -389,6 +408,13 @@ export default function App() {
                             }`}>
                               {note.status}
                             </span>
+                            <button 
+                              onClick={(e) => handleNoteDelete(e, note.id)}
+                              className="p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                              title="Delete from history"
+                            >
+                              <Trash2 size={14} />
+                            </button>
                             <ChevronDown size={14} className={`text-slate-300 transition-transform duration-300 ${selectedNoteId === note.id ? 'rotate-180 text-indigo-500' : ''}`} />
                           </div>
                         </div>

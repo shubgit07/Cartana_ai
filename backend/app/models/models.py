@@ -1,7 +1,7 @@
 import enum
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, Enum, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, String, Enum, ForeignKey, DateTime, Boolean
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 from app.models.database import Base
@@ -42,6 +42,7 @@ class Note(Base):
     raw_text = Column(String)
     status = Column(Enum(NoteStatus), default=NoteStatus.PENDING)
     pipeline_trace = Column(JSONB, default=dict)
+    is_deleted = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     tasks = relationship("Task", back_populates="note")

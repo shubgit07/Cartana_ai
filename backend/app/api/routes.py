@@ -1,11 +1,15 @@
 import os
 import logging
 import shutil
+import threading
+import time
+from collections import deque
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Form
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Form, Request
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.models import database, models
 from app.models.schemas import (
     ProcessInputResponse,
@@ -23,17 +27,55 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 ALLOWED_AUDIO_EXTENSIONS = {".webm", ".wav", ".mp3", ".m4a", ".ogg", ".flac"}
+_rate_limit_lock = threading.Lock()
+_process_input_buckets: dict[str, deque[float]] = {}
+
+
+def _get_client_identifier(request: Request) -> str:
+    forwarded_for = request.headers.get("x-forwarded-for")
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    if request.client and request.client.host:
+        return request.client.host
+    return "unknown"
+
+
+def _enforce_process_input_rate_limit(request: Request) -> None:
+    now = time.time()
+    window_seconds = settings.PROCESS_INPUT_RATE_WINDOW_SECONDS
+    limit = settings.PROCESS_INPUT_RATE_LIMIT
+    client_id = _get_client_identifier(request)
+
+    with _rate_limit_lock:
+        bucket = _process_input_buckets.get(client_id)
+        if bucket is None:
+            bucket = deque()
+            _process_input_buckets[client_id] = bucket
+
+        while bucket and now - bucket[0] > window_seconds:
+            bucket.popleft()
+
+        if len(bucket) >= limit:
+            raise HTTPException(
+                status_code=429,
+                detail=f"Rate limit exceeded. Try again after {window_seconds} seconds.",
+            )
+
+        bucket.append(now)
 
 
 # ─── Input Processing ────────────────────────────────────────────────
 
 @router.post("/process-input", response_model=ProcessInputResponse)
 def process_input(
+    request: Request,
     user_id: int = Form(...),
     text: str = Form(None),
     file: UploadFile = File(None),
     db: Session = Depends(database.get_db),
 ):
+    _enforce_process_input_rate_limit(request)
+
     # Validate user exists
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user:
@@ -110,7 +152,18 @@ def get_task_status(job_id: str):
 
 @router.get("/notes", response_model=list[NoteResponse])
 def get_notes(db: Session = Depends(database.get_db)):
-    return db.query(models.Note).order_by(models.Note.created_at.desc()).all()
+    return db.query(models.Note).filter(models.Note.is_deleted == False).order_by(models.Note.created_at.desc()).all()
+
+
+@router.delete("/notes/{note_id}")
+def delete_note(note_id: int, db: Session = Depends(database.get_db)):
+    note = db.query(models.Note).filter(models.Note.id == note_id).first()
+    if not note:
+        raise HTTPException(status_code=404, detail="Note not found")
+    
+    note.is_deleted = True
+    db.commit()
+    return {"message": "Note deleted successfully"}
 
 
 @router.get("/notes/{note_id}", response_model=NoteResponse)

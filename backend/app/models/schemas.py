@@ -71,5 +71,6 @@ class NoteResponse(BaseModel):
     status: NoteStatus
     raw_text: Optional[str] = None
     pipeline_trace: Optional[dict] = None
+    is_deleted: bool = False
     created_at: Optional[datetime] = None
     tasks: List[TaskResponse] = []

@@ -7,9 +7,7 @@ import {
   Save, 
   X, 
   Calendar, 
-  User, 
-  MoreVertical,
-  AlertCircle
+  User
 } from 'lucide-react';
 
 const TaskCard = ({ task, users = [], onUpdate, onDelete }) => {
@@ -54,14 +52,14 @@ const TaskCard = ({ task, users = [], onUpdate, onDelete }) => {
     : (task.deadline_raw || 'No deadline');
 
   const priorityColors = {
-    high: 'bg-rose-100 text-rose-700 border-rose-200',
-    medium: 'bg-amber-100 text-amber-700 border-amber-200',
-    low: 'bg-emerald-100 text-emerald-700 border-emerald-200'
+    high: 'bg-rose-50 text-rose-700 border-rose-100',
+    medium: 'bg-amber-50 text-amber-700 border-amber-100',
+    low: 'bg-emerald-50 text-emerald-700 border-emerald-100'
   };
 
   if (isEditing) {
     return (
-      <div className="bg-white border-2 border-indigo-500 shadow-xl rounded-[20px] p-5 animate-in fade-in zoom-in-95 duration-200">
+      <div className="bg-white border-2 border-indigo-500 shadow-xl rounded-[20px] p-4 animate-in fade-in zoom-in-95 duration-200">
         <div className="space-y-4">
           <input 
             className="w-full text-base font-bold text-slate-800 border-b-2 border-slate-100 focus:border-indigo-500 px-1 py-1 transition-all outline-none" 
@@ -103,7 +101,7 @@ const TaskCard = ({ task, users = [], onUpdate, onDelete }) => {
               </select>
             </div>
           </div>
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex justify-end gap-2 pt-3 border-t border-slate-50">
             <button onClick={() => setIsEditing(false)} className="px-3 py-1.5 text-slate-500 hover:bg-slate-100 rounded-lg text-sm font-bold transition-colors">
               Cancel
             </button>
@@ -117,17 +115,19 @@ const TaskCard = ({ task, users = [], onUpdate, onDelete }) => {
   }
 
   return (
-    <div className="group bg-white border border-slate-200/60 shadow-[0_2px_4px_rgba(0,0,0,0.02)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] hover:border-indigo-200/50 rounded-[20px] p-5 transition-all duration-300 relative overflow-hidden flex flex-col gap-4">
+    <div className="group bg-white border border-slate-200/60 shadow-[0_2px_4px_rgba(0,0,0,0.02)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] hover:border-indigo-200/50 rounded-[20px] p-4 transition-all duration-300 relative overflow-hidden h-full flex flex-col gap-3">
       {/* Decorative Gradient Background (Hover) */}
       <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50/50 rounded-full blur-3xl -mr-16 -mt-16 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
 
       {/* Header Info */}
-      <div className="flex justify-between items-start gap-4">
-        <span className={`px-2.5 py-1 text-[10px] font-black uppercase tracking-wider rounded-lg border ${priorityColors[task.priority] || priorityColors.medium}`}>
-          {task.priority || 'Medium'}
-        </span>
+      <div className="flex justify-between items-start gap-2 min-w-0">
+        <div className="flex flex-wrap gap-1.5 min-w-0">
+          <span className={`px-2 py-0.5 text-[9px] font-black uppercase tracking-wider rounded-md border whitespace-nowrap ${priorityColors[task.priority] || priorityColors.medium}`}>
+            {task.priority || 'Medium'}
+          </span>
+        </div>
         
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all translate-x-2 group-hover:translate-x-0">
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all translate-x-1 group-hover:translate-x-0 flex-shrink-0">
           <button onClick={() => setIsEditing(true)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors">
             <Edit2 size={14} />
           </button>
@@ -138,43 +138,46 @@ const TaskCard = ({ task, users = [], onUpdate, onDelete }) => {
       </div>
 
       {/* Title & Description */}
-      <div className="space-y-2 flex-1">
-        <h3 className="text-[15px] font-bold text-slate-800 leading-snug group-hover:text-indigo-900 transition-colors">
+      <div className="flex-1 space-y-1.5 min-w-0">
+        <h3 className="text-[15px] font-bold text-slate-800 leading-snug group-hover:text-indigo-900 transition-colors line-clamp-1" title={task.title}>
           {task.title || 'Untitled Task'}
         </h3>
         {task.description && (
-          <p className="text-sm text-slate-500 line-clamp-2 leading-relaxed font-medium">
+          <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed font-medium">
             {task.description}
           </p>
         )}
       </div>
       
       {/* Footer Info */}
-      <div className="pt-4 border-t border-slate-50 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-4 flex-1 overflow-hidden">
-          <div className="flex items-center gap-1.5 text-slate-400 min-w-0">
-            <User size={14} className="flex-shrink-0" />
-            <span className="text-[11px] font-bold truncate">
+      <div className="pt-3 border-t border-slate-50 flex items-center justify-between gap-2 mt-auto min-w-0">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <div className="flex items-center gap-1 text-slate-400 min-w-0">
+            <User size={13} className="flex-shrink-0" />
+            <span className="text-[10px] font-bold truncate">
               {task.assignee?.username || 'Unassigned'}
             </span>
           </div>
-          <div className="flex items-center gap-1.5 text-slate-400">
-            <Calendar size={14} className="flex-shrink-0" />
-            <span className="text-[11px] font-bold whitespace-nowrap">{formattedDeadline}</span>
+          <div className="w-1 h-1 rounded-full bg-slate-200 flex-shrink-0" />
+          <div className="flex items-center gap-1 text-slate-400 min-w-0">
+            <Calendar size={13} className="flex-shrink-0" />
+            <span className="text-[10px] font-bold truncate" title={formattedDeadline}>
+              {formattedDeadline}
+            </span>
           </div>
         </div>
 
         {/* Move Controls */}
-        <div className="flex items-center gap-1 h-8 px-1 bg-slate-50/50 rounded-lg border border-slate-100 opacity-0 group-hover:opacity-100 transition-all translate-y-1 group-hover:translate-y-0">
+        <div className="flex items-center gap-0.5 h-7 px-0.5 bg-slate-50/50 rounded-lg border border-slate-100 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0">
           {task.status !== 'TODO' && (
-            <button onClick={(e) => { e.stopPropagation(); handleMove('prev'); }} className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-white rounded-md transition-colors" title="Move back">
-              <ArrowLeft size={14} />
+            <button onClick={(e) => { e.stopPropagation(); handleMove('prev'); }} className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-white rounded-md transition-colors">
+              <ArrowLeft size={12} />
             </button>
           )}
-          <div className="w-px h-3 bg-slate-200 mx-0.5"></div>
+          {task.status !== 'TODO' && task.status !== 'DONE' && <div className="w-px h-2.5 bg-slate-200 mx-0.5" />}
           {task.status !== 'DONE' && (
-            <button onClick={(e) => { e.stopPropagation(); handleMove('next'); }} className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-white rounded-md transition-colors" title="Move forward">
-              <ArrowRight size={14} />
+            <button onClick={(e) => { e.stopPropagation(); handleMove('next'); }} className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-white rounded-md transition-colors">
+              <ArrowRight size={12} />
             </button>
           )}
         </div>
@@ -184,3 +187,4 @@ const TaskCard = ({ task, users = [], onUpdate, onDelete }) => {
 };
 
 export default TaskCard;
+

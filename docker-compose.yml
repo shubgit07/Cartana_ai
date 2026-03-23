@@ -1,5 +1,31 @@
+version: "3.9"
+
 services:
+  backend:
+    build: ./backend
+    container_name: voicetask_backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - redis
+    environment:
+      - PYTHONPATH=/app
+
+  worker:
+    build: ./backend
+    container_name: voicetask_worker
+    command: celery -A app.core.celery_app.celery_app worker --loglevel=info --pool=solo
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - redis
+    environment:
+      - PYTHONPATH=/app
+
   redis:
-    image: redis:7-alpine
+    image: redis:7
+    container_name: voicetask_redis
     ports:
       - "6379:6379"

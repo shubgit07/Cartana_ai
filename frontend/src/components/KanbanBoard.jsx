@@ -34,15 +34,16 @@ export default function KanbanBoard({ tasks, users, onTaskUpdate, onTaskDelete }
             </div>
             
             {/* Task List Container */}
-            <div className="flex-1 bg-slate-50/40 rounded-[24px] p-3 border border-slate-100/80 shadow-inner flex flex-col gap-4 overflow-y-auto max-h-[calc(100vh-350px)] custom-scrollbar">
+            <div className="bg-slate-50/40 rounded-[24px] p-3 border border-slate-100/80 shadow-inner flex flex-col gap-4 overflow-y-auto h-[70vh] custom-scrollbar">
               {colTasks.map(task => (
-                <TaskCard 
-                  key={task.id} 
-                  task={task} 
-                  users={users}
-                  onUpdate={onTaskUpdate}
-                  onDelete={onTaskDelete}
-                />
+                <div key={task.id} className="flex-shrink-0">
+                  <TaskCard 
+                    task={task} 
+                    users={users}
+                    onUpdate={onTaskUpdate}
+                    onDelete={onTaskDelete}
+                  />
+                </div>
               ))}
               
               {colTasks.length === 0 && (
