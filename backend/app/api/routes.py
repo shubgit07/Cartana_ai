@@ -6,8 +6,9 @@ import time
 from collections import deque
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Form, Request
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Form, Request, BackgroundTasks, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
+import json
 
 from app.core.config import settings
 from app.models import database, models
@@ -18,9 +19,12 @@ from app.models.schemas import (
     TaskUpdate,
     UserResponse,
     NoteResponse,
+    MessageResponse
 )
 from app.workers.worker_main import run_task_pipeline
 from app.core.celery_app import celery_app
+from app.services.websocket_manager import manager
+from app.models.database import SessionLocal
 
 logger = logging.getLogger(__name__)
 
@@ -210,6 +214,7 @@ def get_tasks(
 def update_task(
     task_id: int,
     task_update: TaskUpdate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(database.get_db),
 ):
     task = db.query(models.Task).filter(models.Task.id == task_id).first()
@@ -222,7 +227,89 @@ def update_task(
 
     db.commit()
     db.refresh(task)
+
+    # Broadcast task update
+    task_data = TaskResponse.model_validate(task).model_dump(mode="json")
+    
+    def broadcast_sync():
+        import asyncio
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(manager.broadcast(task_id, {"type": "task_updated", "data": task_data}))
+        except RuntimeError:
+            asyncio.run(manager.broadcast(task_id, {"type": "task_updated", "data": task_data}))
+    
+    background_tasks.add_task(broadcast_sync)
+
     return task
+
+
+@router.get("/tasks/{task_id}/messages", response_model=list[MessageResponse])
+def get_task_messages(task_id: int, db: Session = Depends(database.get_db)):
+    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    messages = db.query(models.Message).filter(models.Message.task_id == task_id).order_by(models.Message.created_at.asc()).all()
+    return messages
+
+
+@router.websocket("/ws/tasks/{task_id}")
+async def websocket_chat_endpoint(websocket: WebSocket, task_id: int):
+    await websocket.accept()
+    
+    db = SessionLocal()
+    try:
+        initial_msg = await websocket.receive_text()
+        initial_data = json.loads(initial_msg)
+        if initial_data.get("type") != "auth" or not initial_data.get("user_id"):
+            await websocket.close(code=1008, reason="Missing or invalid auth")
+            return
+        user_id = initial_data["user_id"]
+        
+        user = db.query(models.User).filter(models.User.id == user_id).first()
+        task = db.query(models.Task).filter(models.Task.id == task_id).first()
+        
+        if not user or not task:
+            await websocket.close(code=1008, reason="Unauthorized")
+            return
+            
+        if user.role == models.RoleEnum.EMPLOYEE and task.assignee_id != user.id:
+            await websocket.close(code=1008, reason="Forbidden access to task")
+            return
+
+        # Register connection
+        manager.active_connections[task_id].append(websocket)
+        logger.info(f"User {user_id} connected to WebSocket for task {task_id}")
+        
+        while True:
+            data = await websocket.receive_text()
+            msg_data = json.loads(data)
+            
+            if msg_data.get("type") == "chat_message":
+                content = msg_data.get("content")
+                if content:
+                    new_message = models.Message(task_id=task_id, sender_id=user_id, content=content)
+                    db.add(new_message)
+                    db.commit()
+                    db.refresh(new_message)
+                    
+                    msg_resp = MessageResponse.model_validate(new_message).model_dump(mode="json")
+                    await manager.broadcast(task_id, {
+                        "type": "chat_message",
+                        "data": msg_resp
+                    })
+
+    except WebSocketDisconnect:
+        logger.info(f"User left WebSocket chat for task {task_id}")
+    except Exception as e:
+        logger.error(f"WebSocket error in task {task_id}: {e}")
+        try:
+            await websocket.close(code=1011)
+        except:
+            pass
+    finally:
+        manager.disconnect(websocket, task_id)
+        db.close()
 
 
 @router.delete("/tasks/{task_id}")

@@ -10,3 +10,4 @@ groq
 python-dotenv
 redis
 celery
+websockets

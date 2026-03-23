@@ -66,3 +66,17 @@ class Task(Base):
 
     assignee = relationship("User", back_populates="tasks")
     note = relationship("Note", back_populates="tasks")
+    messages = relationship("Message", back_populates="task", cascade="all, delete-orphan")
+
+
+class Message(Base):
+    __tablename__ = "messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    task_id = Column(Integer, ForeignKey("tasks.id"), index=True)
+    sender_id = Column(Integer, ForeignKey("users.id"))
+    content = Column(String)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    task = relationship("Task", back_populates="messages")
+    sender = relationship("User")

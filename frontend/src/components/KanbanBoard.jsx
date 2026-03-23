@@ -2,20 +2,20 @@ import React from 'react';
 import TaskCard from './TaskCard';
 import { Layout } from 'lucide-react';
 
-export default function KanbanBoard({ tasks, users, onTaskUpdate, onTaskDelete }) {
+export default function KanbanBoard({ tasks, users, currentUser, onTaskUpdate, onTaskDelete }) {
   const columns = [
     { title: 'To Do', status: 'TODO', color: 'bg-slate-400' },
-    { title: 'In Progress', status: 'IN_PROGRESS', color: 'bg-indigo-500' },
+    { title: 'In Progress', status: 'IN_PROGRESS', color: 'bg-blue-500' },
     { title: 'Done', status: 'DONE', color: 'bg-emerald-500' }
   ];
 
   return (
-    <div className="flex flex-col md:flex-row gap-8 min-h-[600px] w-full pb-10">
+    <div className="flex flex-col lg:flex-row gap-6 min-h-[600px] w-full pb-8">
       {columns.map(col => {
         const colTasks = tasks.filter(t => t.status === col.status);
         
         return (
-          <div key={col.status} className="flex-1 min-w-[300px] flex flex-col group">
+          <div key={col.status} className="flex-1 min-w-0 lg:min-w-[300px] flex flex-col group">
             {/* Column Header */}
             <div className="flex items-center justify-between mb-5 px-2">
               <div className="flex items-center gap-3">
@@ -34,12 +34,13 @@ export default function KanbanBoard({ tasks, users, onTaskUpdate, onTaskDelete }
             </div>
             
             {/* Task List Container */}
-            <div className="bg-slate-50/40 rounded-[24px] p-3 border border-slate-100/80 shadow-inner flex flex-col gap-4 overflow-y-auto h-[70vh] custom-scrollbar">
+            <div className="bg-slate-50/50 rounded-[20px] p-3 border border-slate-200/70 shadow-inner flex flex-col gap-4 overflow-y-auto h-[65vh] lg:h-[70vh] custom-scrollbar">
               {colTasks.map(task => (
                 <div key={task.id} className="flex-shrink-0">
                   <TaskCard 
                     task={task} 
                     users={users}
+                    currentUser={currentUser}
                     onUpdate={onTaskUpdate}
                     onDelete={onTaskDelete}
                   />

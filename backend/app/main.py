@@ -86,3 +86,10 @@ def on_startup():
         db.rollback()
     finally:
         db.close()
+
+from app.services.websocket_manager import manager
+
+@app.on_event("startup")
+async def on_startup_async():
+    await manager.connect_redis()
+

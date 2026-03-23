@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { 
   Home, 
@@ -34,7 +34,29 @@ export default function App() {
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
   const [notes, setNotes] = useState([]);
   const [selectedNoteId, setSelectedNoteId] = useState(null);
+  const [expandedNoteIds, setExpandedNoteIds] = useState([]);
+  const [noteHeights, setNoteHeights] = useState({});
   const [backendError, setBackendError] = useState(null);
+  const noteContentRefs = useRef({});
+
+  const measureExpandedHeights = () => {
+    setNoteHeights((prev) => {
+      const next = { ...prev };
+      expandedNoteIds.forEach((id) => {
+        const el = noteContentRefs.current[id];
+        if (el) {
+          next[id] = el.scrollHeight;
+        }
+      });
+      return next;
+    });
+  };
+
+  const toggleNoteExpansion = (id) => {
+    setExpandedNoteIds((prev) => (
+      prev.includes(id) ? prev.filter((noteId) => noteId !== id) : [...prev, id]
+    ));
+  };
 
   const fetchUsers = async () => {
     try {
@@ -110,6 +132,16 @@ export default function App() {
       }
     }
   }, [currentUser]);
+
+  useEffect(() => {
+    measureExpandedHeights();
+  }, [expandedNoteIds, notes]);
+
+  useEffect(() => {
+    const handleResize = () => measureExpandedHeights();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [expandedNoteIds]);
 
   const handleTaskUpdate = async (id, updateData) => {
     try {
@@ -205,7 +237,7 @@ export default function App() {
           </p>
           <button 
             onClick={() => { setBackendError(null); fetchUsers(); }}
-            className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all active:scale-95"
+            className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all active:scale-95"
           >
             Retry Connection
           </button>
@@ -219,16 +251,16 @@ export default function App() {
   const isManager = currentUser.role === 'MANAGER';
 
   return (
-    <div className="flex h-screen bg-[#F9FAFB] text-slate-900 font-sans overflow-hidden">
+    <div className="flex h-screen bg-[#F8FAFC] text-slate-900 font-sans overflow-hidden">
 
       {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-slate-200 flex flex-col z-20 shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
+      <aside className="hidden md:flex md:w-64 bg-white border-r border-slate-200 flex-col z-20 shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
         <div className="p-6 mb-2 flex items-center gap-3">
-          <div className="bg-indigo-600 p-2 rounded-xl shadow-md shadow-indigo-200">
+          <div className="bg-blue-600 p-2 rounded-xl shadow-md shadow-blue-200">
             <Zap className="text-white w-5 h-5 fill-current" />
           </div>
           <h1 className="text-xl font-bold tracking-tight text-slate-800">
-            Cartana <span className="text-indigo-600 text-sm font-medium ml-1">AI</span>
+            Cartana <span className="text-blue-600 text-sm font-medium ml-1">AI</span>
           </h1>
         </div>
         
@@ -245,9 +277,9 @@ export default function App() {
         </nav>
 
         <div className="p-4 mt-auto border-t border-slate-100">
-          <div className="bg-indigo-50 rounded-2xl p-4">
-            <p className="text-xs font-semibold text-indigo-700 mb-1 font-mono">MVP STATUS</p>
-            <p className="text-[11px] text-indigo-600 leading-relaxed">
+          <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100">
+            <p className="text-xs font-semibold text-blue-700 mb-1 font-mono">MVP STATUS</p>
+            <p className="text-[11px] text-blue-600 leading-relaxed">
               Phase 1.0 Complete. <br/>Ready for Phase 1.5.
             </p>
           </div>
@@ -258,7 +290,7 @@ export default function App() {
       <div className="flex-1 flex flex-col relative overflow-hidden">
         
         {/* Header */}
-        <header className="h-18 min-h-[72px] bg-white/80 backdrop-blur-md border-b border-slate-200 px-8 flex items-center justify-between sticky top-0 z-10">
+        <header className="h-18 min-h-[72px] bg-white/85 backdrop-blur-md border-b border-slate-200 px-4 md:px-8 flex items-center justify-between sticky top-0 z-10">
           <div className="flex items-center gap-3">
             <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
             <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-widest">Active Workspace</h2>
@@ -270,7 +302,7 @@ export default function App() {
                 onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
                 className="flex items-center gap-3 px-4 py-2 rounded-full hover:bg-slate-50 border border-slate-200 transition-all active:scale-95 group"
               >
-                <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-sm shadow-sm uppercase">
+                <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm shadow-sm uppercase">
                   {currentUser.username.charAt(0)}
                 </div>
                 <div className="text-left">
@@ -291,11 +323,11 @@ export default function App() {
                           setIsUserDropdownOpen(false);
                         }}
                         className={`w-full flex items-center gap-3 p-2.5 rounded-xl text-sm font-medium transition-colors ${
-                          currentUser.id === user.id ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50'
+                          currentUser.id === user.id ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'
                         }`}
                       >
                         <div className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs uppercase ${
-                          currentUser.id === user.id ? 'bg-indigo-200 text-indigo-700' : 'bg-slate-100 text-slate-500'
+                          currentUser.id === user.id ? 'bg-blue-200 text-blue-700' : 'bg-slate-100 text-slate-500'
                         }`}>
                           {user.username.charAt(0)}
                         </div>
@@ -316,21 +348,21 @@ export default function App() {
         </header>
 
         {/* Scrollable Dashboard Content */}
-        <main className="flex-1 overflow-y-auto bg-[#F9FAFB] p-8 scroll-smooth">
+        <main className="flex-1 overflow-y-auto bg-[#F8FAFC] p-4 md:p-8 scroll-smooth">
           <div className="max-w-6xl mx-auto space-y-10">
             
             <div className="flex flex-col gap-2">
-              <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Main Dashboard</h1>
+              <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">Main Dashboard</h1>
               <p className="text-slate-500 font-medium">Capture ideas and orchestrate your tasks with AI.</p>
             </div>
 
             {/* Input Section - Refined Card */}
             {isManager && (
-              <div className="bg-white rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-200/60 p-1 overflow-hidden transition-all hover:shadow-[0_8px_40px_rgb(0,0,0,0.08)]">
+              <div className="bg-[linear-gradient(145deg,#f8fbff,#eef2ff)] rounded-[20px] border border-slate-200/80 p-1 overflow-hidden transition-all duration-200 ease-in-out shadow-[0_10px_30px_rgba(15,23,42,0.12)] hover:shadow-[0_14px_34px_rgba(15,23,42,0.16)]">
                 <div className="p-8">
-                  <div className="flex items-center gap-2 mb-6 text-indigo-600">
-                      <Zap size={20} className="fill-current" />
-                      <span className="text-sm font-bold uppercase tracking-[2px]">Quick Ingest</span>
+                  <div className="group flex items-center gap-2 mb-6 text-[#818cf8]">
+                      <Zap size={20} className="fill-current opacity-80 transition-all duration-200 ease-in-out group-hover:opacity-100" />
+                      <span className="text-sm font-semibold uppercase tracking-[2px] text-slate-700">Quick Ingest</span>
                   </div>
 
                   <div className="relative group">
@@ -339,14 +371,15 @@ export default function App() {
                       value={textInput}
                       onChange={(e) => setTextInput(e.target.value)}
                       onKeyDown={handleTextKeyDown}
+                      spellCheck={false}
                       placeholder="Describe your meeting or project needs here... Cartana will extract the magic details."
-                      className="w-full bg-slate-50/50 border-2 border-slate-100 rounded-2xl px-6 py-6 text-lg text-slate-800 placeholder-slate-400 resize-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 focus:bg-white transition-all outline-none"
+                      className="w-full bg-white/90 border border-slate-300/80 rounded-2xl px-6 py-5 text-base md:text-lg text-slate-800 placeholder:text-slate-400 resize-none focus:border-[#6366f1] focus:shadow-[0_0_0_2px_rgba(99,102,241,0.3)] focus:bg-white transition-all duration-200 ease-in-out outline-none"
                       rows={4}
                       disabled={isProcessing}
                     />
                   </div>
                   
-                  <div className="flex items-center justify-between mt-6 gap-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mt-6 gap-4">
                     <div className="flex items-center gap-3">
                       <AudioRecorderButton onStarted={onProcessingStarted} disabled={isProcessing} currentUserId={currentUser.id} />
                     </div>
@@ -355,9 +388,9 @@ export default function App() {
                       id="submit-text-btn"
                       onClick={handleTextSubmit}
                       disabled={isProcessing || !textInput.trim()}
-                      className="h-12 px-8 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-[0_4px_14px_rgba(79,70,229,0.4)] hover:shadow-[0_6px_20px_rgba(79,70,229,0.4)] active:scale-[0.98] flex items-center gap-2"
+                      className="group h-12 sm:h-13 px-8 rounded-xl bg-[linear-gradient(135deg,#6366f1,#8b5cf6)] text-white text-sm font-semibold border border-indigo-400/40 hover:bg-[linear-gradient(135deg,#7276ff,#9b68ff)] disabled:bg-none disabled:bg-[#374151] disabled:text-[#9ca3af] disabled:border-slate-600/60 disabled:cursor-not-allowed transition-all duration-200 ease-in-out shadow-[0_8px_20px_rgba(99,102,241,0.4)] hover:-translate-y-[1px] hover:shadow-[0_10px_25px_rgba(99,102,241,0.5)] disabled:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300/60 active:scale-[0.99] inline-flex items-center justify-center gap-2"
                     >
-                      Extract Tasks <Send size={16} />
+                      Extract Tasks <Send size={16} className="text-[#818cf8] opacity-80 transition-all duration-200 ease-in-out group-hover:opacity-100 group-hover:text-white" />
                     </button>
                   </div>
                 </div>
@@ -376,7 +409,7 @@ export default function App() {
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xl font-bold text-slate-800 flex items-center gap-3">
-                    <Activity size={20} className="text-indigo-600" />
+                    <Activity size={20} className="text-blue-600" />
                     Recent Activity
                   </h3>
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{notes.length} Inputs Total</span>
@@ -384,40 +417,78 @@ export default function App() {
                 
                 <div className="bg-white rounded-[24px] border border-slate-200/60 shadow-sm overflow-hidden transition-all hover:shadow-md">
                   <div className="max-h-[320px] overflow-y-auto custom-scrollbar">
-                    <div className="divide-y divide-slate-100">
+                    <div className="p-2 space-y-2">
                       {notes.map((note) => (
+                        (() => {
+                          const isExpanded = expandedNoteIds.includes(note.id);
+
+                          return (
                         <div 
                           key={note.id} 
-                          onClick={() => fetchNoteData(note.id)}
-                          className={`p-4 hover:bg-slate-50 transition-all cursor-pointer flex items-center justify-between group ${selectedNoteId === note.id ? 'bg-indigo-50/50 border-l-4 border-indigo-500' : 'border-l-4 border-transparent'}`}
+                          className={`rounded-xl border-l-4 transition-all group ${selectedNoteId === note.id ? 'bg-blue-50/60 border-blue-500' : 'border-transparent hover:bg-slate-50'}`}
                         >
-                          <div className="flex-1 min-w-0 pr-4">
-                            <p className="text-sm font-semibold text-slate-700 truncate group-hover:text-indigo-700 transition-colors">
-                              {note.raw_text}
-                            </p>
-                            <p className="text-[10px] text-slate-400 font-bold uppercase mt-1 flex items-center gap-2">
-                              {new Date(note.created_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                            </p>
-                          </div>
-                          
-                          <div className="flex items-center gap-3">
-                            <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider ${
-                              note.status === 'processed' ? 'bg-emerald-100 text-emerald-700' : 
-                              note.status === 'pending' ? 'bg-amber-100 text-amber-700 animate-pulse' : 
-                              'bg-rose-100 text-rose-700'
-                            }`}>
-                              {note.status}
-                            </span>
-                            <button 
-                              onClick={(e) => handleNoteDelete(e, note.id)}
-                              className="p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                              title="Delete from history"
+                          <button
+                            onClick={() => {
+                              fetchNoteData(note.id);
+                              toggleNoteExpansion(note.id);
+                            }}
+                            className="w-full p-4 text-left flex items-start justify-between gap-3"
+                          >
+                            <div className="flex-1 min-w-0 pr-2">
+                              <p className="text-sm font-semibold text-slate-700 truncate group-hover:text-blue-700 transition-colors">
+                                {note.raw_text}
+                              </p>
+                              <p className="text-[10px] text-slate-400 font-bold uppercase mt-1 flex items-center gap-2">
+                                {new Date(note.created_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center gap-3 flex-shrink-0">
+                              <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider ${
+                                note.status === 'processed' ? 'bg-emerald-100 text-emerald-700' :
+                                note.status === 'pending' ? 'bg-amber-100 text-amber-700 animate-pulse' :
+                                'bg-rose-100 text-rose-700'
+                              }`}>
+                                {note.status}
+                              </span>
+                              <span
+                                className={`text-slate-300 transition-transform duration-300 ${isExpanded ? 'rotate-180 text-blue-500' : ''}`}
+                              >
+                                <ChevronDown size={14} />
+                              </span>
+                            </div>
+                          </button>
+
+                          <div
+                            style={{ maxHeight: isExpanded ? `${noteHeights[note.id] || 0}px` : '0px' }}
+                            className="overflow-hidden transition-[max-height] duration-300 ease-in-out"
+                          >
+                            <div
+                              ref={(el) => {
+                                noteContentRefs.current[note.id] = el;
+                              }}
+                              className="px-4 pb-4"
                             >
-                              <Trash2 size={14} />
-                            </button>
-                            <ChevronDown size={14} className={`text-slate-300 transition-transform duration-300 ${selectedNoteId === note.id ? 'rotate-180 text-indigo-500' : ''}`} />
+                              <div className="rounded-xl bg-white border border-slate-200 p-3">
+                                <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+                                  {note.raw_text}
+                                </p>
+                                <div className="mt-3 pt-3 border-t border-slate-100 flex justify-end">
+                                  <button
+                                    onClick={(e) => handleNoteDelete(e, note.id)}
+                                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                    title="Delete from history"
+                                  >
+                                    <Trash2 size={13} />
+                                    Delete
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         </div>
+                          );
+                        })()
                       ))}
                     </div>
                   </div>
@@ -443,7 +514,7 @@ export default function App() {
                     className={`h-10 px-4 rounded-xl font-bold text-xs uppercase tracking-widest flex items-center gap-2 transition-all border ${
                       showTrace 
                       ? 'bg-slate-800 text-white border-slate-800 shadow-lg' 
-                      : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300 hover:text-indigo-600'
+                      : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300 hover:text-blue-600'
                     }`}
                   >
                     <Activity size={16} />
@@ -456,7 +527,7 @@ export default function App() {
               {showTrace && pipelineTrace && (
                 <div className="bg-slate-900 rounded-[20px] p-6 overflow-hidden shadow-2xl border border-slate-800 animate-in slide-in-from-top-4 duration-300">
                   <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
-                    <span className="text-indigo-400 font-mono text-xs font-bold uppercase tracking-wider">Debug: Internal Pipeline Trace</span>
+                    <span className="text-blue-400 font-mono text-xs font-bold uppercase tracking-wider">Debug: Internal Pipeline Trace</span>
                     <span className="text-slate-600 text-[10px] font-mono">v1.2.0-MVP</span>
                   </div>
                   <div className="overflow-x-auto max-h-[400px] custom-scrollbar">
@@ -467,11 +538,11 @@ export default function App() {
                 </div>
               )}
 
-              {/* Kanban Board Container */}
               <div className="mt-8 transition-all">
                 <KanbanBoard
                   tasks={tasks}
                   users={users}
+                  currentUser={currentUser}
                   onTaskUpdate={handleTaskUpdate}
                   onTaskDelete={handleTaskDelete}
                 />
@@ -493,13 +564,13 @@ function SidebarLink({ icon, label, active = false, soon = false }) {
       href="#" 
       className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all group ${
         active 
-        ? 'bg-indigo-50 text-indigo-700 font-bold shadow-sm' 
+        ? 'bg-blue-50 text-blue-700 font-bold shadow-sm' 
         : soon 
           ? 'text-slate-400 cursor-not-allowed grayscale' 
           : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 font-medium'
       }`}
     >
-      <span className={`${active ? 'text-indigo-600' : 'text-slate-400 group-hover:text-slate-600'}`}>
+      <span className={`${active ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600'}`}>
         {icon}
       </span>
       <span className="text-[14px]">{label}</span>
@@ -570,15 +641,15 @@ function AudioRecorderButton({ onStarted, disabled, currentUserId }) {
       id="audio-record-btn"
       onClick={isRecording ? stopRecording : startRecording}
       disabled={disabled && !isRecording}
-      className={`h-12 px-6 rounded-xl font-bold text-sm transition-all flex items-center gap-3 border-2 ${
+      className={`group h-12 sm:h-13 min-w-[170px] px-6 rounded-xl font-semibold text-sm tracking-wide transition-all duration-200 ease-in-out inline-flex items-center justify-center gap-2.5 border focus-visible:outline-none focus-visible:ring-2 ${
         isRecording
-        ? 'bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-100 shadow-[0_0_20px_rgba(225,29,72,0.15)] animate-pulse'
-        : 'bg-white text-slate-600 border-slate-100 hover:border-indigo-200 hover:text-indigo-600 hover:bg-indigo-50/30'
-      } disabled:opacity-40 disabled:cursor-not-allowed`}
+        ? 'bg-indigo-100 text-indigo-700 border-[#6366f1] hover:bg-indigo-200/80 hover:text-indigo-800 shadow-[0_0_14px_rgba(99,102,241,0.22)] focus-visible:ring-indigo-300/60'
+        : 'bg-white/80 text-[#6366f1] border-[rgba(99,102,241,0.5)] hover:bg-[rgba(99,102,241,0.08)] hover:border-[#6366f1] hover:text-[#4f46e5] shadow-[0_4px_12px_rgba(79,70,229,0.08)] hover:shadow-[0_0_10px_rgba(99,102,241,0.18)] focus-visible:ring-indigo-300/60'
+      } disabled:bg-slate-200/80 disabled:text-slate-400 disabled:border-slate-300 disabled:shadow-none disabled:cursor-not-allowed`}
     >
-      <div className={`w-2.5 h-2.5 rounded-full ${isRecording ? 'bg-rose-600 animate-ping' : 'bg-slate-300'}`}></div>
+      <div className={`w-2.5 h-2.5 rounded-full ${isRecording ? 'bg-indigo-600 animate-pulse' : 'bg-[#6366f1] opacity-80 group-hover:opacity-100'}`}></div>
       {isRecording ? 'Stop Recording' : 'Record Audio'}
-      <Mic size={18} className={isRecording ? 'text-rose-600' : 'text-slate-400'} />
+      <Mic size={18} className={isRecording ? 'text-indigo-700' : 'text-[#6366f1] opacity-80 transition-all duration-200 ease-in-out group-hover:opacity-100'} />
     </button>
   );
 }

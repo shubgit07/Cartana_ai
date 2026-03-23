@@ -50,9 +50,9 @@ const TaskStatus = ({ jobId, onComplete }) => {
       label: 'Processing Failed'
     },
     PROCESSING: {
-      icon: <Loader2 size={16} className="text-indigo-500 animate-spin" />,
-      bg: 'bg-indigo-50 border-indigo-100',
-      text: 'text-indigo-700',
+      icon: <Loader2 size={16} className="text-blue-500 animate-spin" />,
+      bg: 'bg-blue-50 border-blue-100',
+      text: 'text-blue-700',
       label: 'AI is Extracting Tasks'
     },
     PENDING: {
@@ -92,8 +92,8 @@ const TaskStatus = ({ jobId, onComplete }) => {
       )}
 
       {(status === 'PENDING' || status === 'PROCESSING') && (
-        <div className="mt-4 h-1.5 w-full bg-indigo-200/30 rounded-full overflow-hidden">
-           <div className="h-full bg-indigo-500 rounded-full w-1/3 animate-[progress_2s_ease-in-out_infinite]"></div>
+        <div className="mt-4 h-1.5 w-full bg-blue-200/30 rounded-full overflow-hidden">
+          <div className="h-full bg-blue-500 rounded-full w-1/3 animate-[progress_2s_ease-in-out_infinite]"></div>
         </div>
       )}
     </div>

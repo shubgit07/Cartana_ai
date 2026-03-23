@@ -7,13 +7,16 @@ import {
   Save, 
   X, 
   Calendar, 
-  User
+  User,
+  MessageSquare
 } from 'lucide-react';
+import TaskChat from './TaskChat';
 
-const TaskCard = ({ task, users = [], onUpdate, onDelete }) => {
+const TaskCard = ({ task, users = [], currentUser, onUpdate, onDelete }) => {
   if (!task) return null;
 
   const [isEditing, setIsEditing] = useState(false);
+  const [showChat, setShowChat] = useState(false);
   const [formData, setFormData] = useState({
     title: task.title || '',
     description: task.description || '',
@@ -57,18 +60,23 @@ const TaskCard = ({ task, users = [], onUpdate, onDelete }) => {
     low: 'bg-emerald-50 text-emerald-700 border-emerald-100'
   };
 
+  const manager = users.find((u) => u.role === 'MANAGER');
+  const connectedWith = currentUser?.role === 'MANAGER'
+    ? (task.assignee?.username || 'Assigned member')
+    : (manager?.username || 'Manager');
+
   if (isEditing) {
     return (
-      <div className="bg-white border-2 border-indigo-500 shadow-xl rounded-[20px] p-4 animate-in fade-in zoom-in-95 duration-200">
+      <div className="bg-white border-2 border-blue-500 shadow-xl rounded-[20px] p-4 animate-in fade-in zoom-in-95 duration-200">
         <div className="space-y-4">
           <input 
-            className="w-full text-base font-bold text-slate-800 border-b-2 border-slate-100 focus:border-indigo-500 px-1 py-1 transition-all outline-none" 
+            className="w-full text-base font-semibold text-slate-800 border-b-2 border-slate-100 focus:border-blue-500 px-1 py-1.5 transition-all outline-none" 
             value={formData.title}
             onChange={(e) => setFormData({...formData, title: e.target.value})}
             placeholder="Task title..."
           />
           <textarea 
-            className="w-full text-sm text-slate-600 bg-slate-50 rounded-xl px-3 py-2 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 transition-all outline-none border border-slate-100" 
+            className="w-full text-sm text-slate-600 bg-slate-50 rounded-xl px-3 py-2.5 focus:bg-white focus:ring-4 focus:ring-blue-100 transition-all outline-none border border-slate-200 focus:border-blue-500" 
             value={formData.description}
             onChange={(e) => setFormData({...formData, description: e.target.value})}
             placeholder="Add details..."
@@ -78,7 +86,7 @@ const TaskCard = ({ task, users = [], onUpdate, onDelete }) => {
             <div className="space-y-1">
               <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Priority</label>
               <select 
-                className="w-full bg-slate-50 border border-slate-100 rounded-lg px-2 py-1.5 text-sm outline-none focus:border-indigo-500"
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 value={formData.priority}
                 onChange={(e) => setFormData({...formData, priority: e.target.value})}
               >
@@ -90,7 +98,7 @@ const TaskCard = ({ task, users = [], onUpdate, onDelete }) => {
             <div className="space-y-1">
               <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Assignee</label>
               <select 
-                className="w-full bg-slate-50 border border-slate-100 rounded-lg px-2 py-1.5 text-sm outline-none focus:border-indigo-500"
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 value={formData.assignee_id || ''}
                 onChange={(e) => setFormData({...formData, assignee_id: e.target.value})}
               >
@@ -105,7 +113,7 @@ const TaskCard = ({ task, users = [], onUpdate, onDelete }) => {
             <button onClick={() => setIsEditing(false)} className="px-3 py-1.5 text-slate-500 hover:bg-slate-100 rounded-lg text-sm font-bold transition-colors">
               Cancel
             </button>
-            <button onClick={handleSave} className="px-4 py-1.5 text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg flex items-center gap-2 text-sm font-bold shadow-md shadow-indigo-100 transition-all active:scale-95">
+            <button onClick={handleSave} className="px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg flex items-center gap-2 text-sm font-bold shadow-md shadow-blue-100 transition-all active:scale-95">
               <Save size={16} /> Save Changes
             </button>
           </div>
@@ -115,9 +123,9 @@ const TaskCard = ({ task, users = [], onUpdate, onDelete }) => {
   }
 
   return (
-    <div className="group bg-white border border-slate-200/60 shadow-[0_2px_4px_rgba(0,0,0,0.02)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] hover:border-indigo-200/50 rounded-[20px] p-4 transition-all duration-300 relative overflow-hidden h-full flex flex-col gap-3">
+    <div className="group bg-white border border-slate-200/80 shadow-[0_2px_4px_rgba(15,23,42,0.03)] hover:shadow-[0_10px_24px_rgba(15,23,42,0.08)] hover:border-blue-200 rounded-[20px] p-4 transition-all duration-300 relative overflow-hidden h-full flex flex-col gap-3.5">
       {/* Decorative Gradient Background (Hover) */}
-      <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50/50 rounded-full blur-3xl -mr-16 -mt-16 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+      <div className="absolute top-0 right-0 w-28 h-28 bg-blue-50/70 rounded-full blur-3xl -mr-14 -mt-14 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
 
       {/* Header Info */}
       <div className="flex justify-between items-start gap-2 min-w-0">
@@ -128,7 +136,7 @@ const TaskCard = ({ task, users = [], onUpdate, onDelete }) => {
         </div>
         
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all translate-x-1 group-hover:translate-x-0 flex-shrink-0">
-          <button onClick={() => setIsEditing(true)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors">
+          <button onClick={() => setIsEditing(true)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
             <Edit2 size={14} />
           </button>
           <button onClick={() => onDelete(task.id)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors">
@@ -139,7 +147,7 @@ const TaskCard = ({ task, users = [], onUpdate, onDelete }) => {
 
       {/* Title & Description */}
       <div className="flex-1 space-y-1.5 min-w-0">
-        <h3 className="text-[15px] font-bold text-slate-800 leading-snug group-hover:text-indigo-900 transition-colors line-clamp-1" title={task.title}>
+        <h3 className="text-[15px] font-semibold text-slate-800 leading-snug group-hover:text-slate-900 transition-colors line-clamp-1" title={task.title}>
           {task.title || 'Untitled Task'}
         </h3>
         {task.description && (
@@ -150,7 +158,7 @@ const TaskCard = ({ task, users = [], onUpdate, onDelete }) => {
       </div>
       
       {/* Footer Info */}
-      <div className="pt-3 border-t border-slate-50 flex items-center justify-between gap-2 mt-auto min-w-0">
+      <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2 mt-auto min-w-0">
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <div className="flex items-center gap-1 text-slate-400 min-w-0">
             <User size={13} className="flex-shrink-0" />
@@ -165,23 +173,50 @@ const TaskCard = ({ task, users = [], onUpdate, onDelete }) => {
               {formattedDeadline}
             </span>
           </div>
+          <div className="w-1 h-1 rounded-full bg-slate-200 flex-shrink-0" />
+          <button 
+            onClick={(e) => { e.stopPropagation(); setShowChat(!showChat); }}
+            className={`h-7 w-7 inline-flex items-center justify-center rounded-md border transition-all ${showChat ? 'text-blue-600 border-blue-200 bg-blue-50 shadow-sm' : 'text-slate-500 border-slate-200 hover:text-blue-600 hover:bg-slate-50 hover:border-blue-200'}`}
+            title="Open task chat"
+            aria-label="Open task chat"
+          >
+            <MessageSquare size={13} />
+          </button>
         </div>
 
         {/* Move Controls */}
         <div className="flex items-center gap-0.5 h-7 px-0.5 bg-slate-50/50 rounded-lg border border-slate-100 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0">
           {task.status !== 'TODO' && (
-            <button onClick={(e) => { e.stopPropagation(); handleMove('prev'); }} className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-white rounded-md transition-colors">
+            <button onClick={(e) => { e.stopPropagation(); handleMove('prev'); }} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-white rounded-md transition-colors">
               <ArrowLeft size={12} />
             </button>
           )}
           {task.status !== 'TODO' && task.status !== 'DONE' && <div className="w-px h-2.5 bg-slate-200 mx-0.5" />}
           {task.status !== 'DONE' && (
-            <button onClick={(e) => { e.stopPropagation(); handleMove('next'); }} className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-white rounded-md transition-colors">
+            <button onClick={(e) => { e.stopPropagation(); handleMove('next'); }} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-white rounded-md transition-colors">
               <ArrowRight size={12} />
             </button>
           )}
         </div>
       </div>
+
+      {showChat && (
+        <>
+          <div
+            className="fixed inset-0 bg-slate-900/25 backdrop-blur-[1px] z-40"
+            onClick={() => setShowChat(false)}
+          />
+          <div className="fixed top-0 right-0 h-full w-full sm:w-[420px] z-50 shadow-2xl border-l border-slate-200 bg-white animate-in slide-in-from-right duration-200">
+            <TaskChat
+              task={task}
+              currentUser={currentUser}
+              connectedWith={connectedWith}
+              onClose={() => setShowChat(false)}
+              onTaskUpdated={(updatedTask) => onUpdate(task.id, updatedTask)}
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 };

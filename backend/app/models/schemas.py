@@ -74,3 +74,20 @@ class NoteResponse(BaseModel):
     is_deleted: bool = False
     created_at: Optional[datetime] = None
     tasks: List[TaskResponse] = []
+
+
+class MessageCreate(BaseModel):
+    content: str
+
+
+class MessageResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    task_id: int
+    sender_id: int
+    content: str
+    created_at: datetime
+    
+    # Include sender details
+    sender: Optional[UserResponse] = None
