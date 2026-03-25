@@ -1,27 +1,32 @@
-# Cartana AI (MVP)
+# Cartana AI (WIP)
 
-## Overview
-
-Cartana AI converts voice or text input into structured, assignable tasks with extracted details like deadlines, priorities, and assignees.
-
-## Status
-
-MVP in progress with core features implemented and under refinement.
+Cartana AI is a full-stack voice/text-to-task intelligence platform that converts unstructured managerial input into structured, editable tasks using an asynchronous AI pipeline.
 
 ## Features
-
-* Voice and text-based task creation
-* AI-driven task extraction
-* Automatic task assignment
-* Manager and employee dashboards
-* Real-time chat using WebSockets
-* Async processing with Redis and Celery
-* NeonDB (PostgreSQL) integration
+- Voice + text input processing  
+- Async AI pipeline (transcription → extraction → normalization)  
+- Automatic task creation with deadline, priority, assignee  
+- Kanban board   
+- Real-time task chat using WebSockets  
+- Pipeline trace for debugging and transparency  
 
 ## Tech Stack
+- Backend: FastAPI, Celery, Redis, PostgreSQL  
+- Frontend: React, Vite, TailwindCSS  
+- AI: Whisper, LLM-based extraction  
+- Real-time: WebSockets + Redis Pub/Sub  
+- DevOps: Docker, Docker Compose  
 
-React, TailwindCSS, Redux, FastAPI, PostgreSQL (NeonDB), Redis, Celery, WebSockets, Docker
+## Architecture
+Input → FastAPI → Redis Queue → Celery Worker → AI Pipeline → PostgreSQL → Frontend  
 
-## Note
 
-Project is under active development and subject to change.
+
+
+
+
+Getting Started
+```bash
+git clone https://github.com/your-username/cartana-ai.git
+cd cartana-ai
+docker-compose up --build
