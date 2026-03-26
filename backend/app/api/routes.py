@@ -19,7 +19,8 @@ from app.models.schemas import (
     TaskUpdate,
     UserResponse,
     NoteResponse,
-    MessageResponse
+    MessageResponse,
+    ChatThreadMemberResponse,
 )
 from app.workers.worker_main import run_task_pipeline
 from app.core.celery_app import celery_app
@@ -185,6 +186,90 @@ def get_users(db: Session = Depends(database.get_db)):
     return db.query(models.User).all()
 
 
+def _get_user_or_404(db: Session, user_id: int) -> models.User:
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
+
+
+def _get_default_manager_or_404(db: Session) -> models.User:
+    manager_user = db.query(models.User).filter(models.User.role == models.RoleEnum.MANAGER).first()
+    if not manager_user:
+        raise HTTPException(status_code=404, detail="Manager user not found")
+    return manager_user
+
+
+def _resolve_chat_pair(current_user: models.User, counterpart: models.User, db: Session) -> tuple[int, int]:
+    if current_user.role == models.RoleEnum.MANAGER:
+        if counterpart.role != models.RoleEnum.EMPLOYEE:
+            raise HTTPException(status_code=403, detail="Managers can only open employee threads")
+        return current_user.id, counterpart.id
+
+    if current_user.role == models.RoleEnum.EMPLOYEE:
+        manager_user = _get_default_manager_or_404(db)
+        if counterpart.id != manager_user.id:
+            raise HTTPException(status_code=403, detail="Employees can only chat with the manager")
+        return manager_user.id, current_user.id
+
+    raise HTTPException(status_code=403, detail="Invalid role for chat")
+
+
+@router.get("/chat/members", response_model=list[ChatThreadMemberResponse])
+def get_chat_members(user_id: int, db: Session = Depends(database.get_db)):
+    current_user = _get_user_or_404(db, user_id)
+
+    if current_user.role == models.RoleEnum.MANAGER:
+        counterparts = db.query(models.User).filter(models.User.role == models.RoleEnum.EMPLOYEE).order_by(models.User.username.asc()).all()
+        manager_id = current_user.id
+        results = []
+        for member in counterparts:
+            latest = (
+                db.query(models.Message)
+                .filter(models.Message.manager_id == manager_id, models.Message.member_id == member.id)
+                .order_by(models.Message.created_at.desc())
+                .first()
+            )
+            results.append(
+                ChatThreadMemberResponse(
+                    member=UserResponse.model_validate(member),
+                    last_message_at=latest.created_at if latest else None,
+                    last_message_preview=latest.content[:120] if latest else None,
+                )
+            )
+        return results
+
+    manager_user = _get_default_manager_or_404(db)
+    latest = (
+        db.query(models.Message)
+        .filter(models.Message.manager_id == manager_user.id, models.Message.member_id == current_user.id)
+        .order_by(models.Message.created_at.desc())
+        .first()
+    )
+    return [
+        ChatThreadMemberResponse(
+            member=UserResponse.model_validate(manager_user),
+            last_message_at=latest.created_at if latest else None,
+            last_message_preview=latest.content[:120] if latest else None,
+        )
+    ]
+
+
+@router.get("/chat/threads/{member_id}/messages", response_model=list[MessageResponse])
+def get_chat_thread_messages(member_id: int, user_id: int, db: Session = Depends(database.get_db)):
+    current_user = _get_user_or_404(db, user_id)
+    counterpart = _get_user_or_404(db, member_id)
+    manager_id, member_thread_id = _resolve_chat_pair(current_user, counterpart, db)
+
+    messages = (
+        db.query(models.Message)
+        .filter(models.Message.manager_id == manager_id, models.Message.member_id == member_thread_id)
+        .order_by(models.Message.created_at.asc())
+        .all()
+    )
+    return messages
+
+
 # ─── Tasks ────────────────────────────────────────────────────────────
 
 @router.get("/tasks", response_model=list[TaskResponse])
@@ -278,7 +363,7 @@ async def websocket_chat_endpoint(websocket: WebSocket, task_id: int):
             return
 
         # Register connection
-        manager.active_connections[task_id].append(websocket)
+        manager.connect_to_channel(websocket, f"task_chat:{task_id}")
         logger.info(f"User {user_id} connected to WebSocket for task {task_id}")
         
         while True:
@@ -309,6 +394,77 @@ async def websocket_chat_endpoint(websocket: WebSocket, task_id: int):
             pass
     finally:
         manager.disconnect(websocket, task_id)
+        db.close()
+
+
+@router.websocket("/ws/chat/{member_id}")
+async def websocket_member_chat_endpoint(websocket: WebSocket, member_id: int):
+    await websocket.accept()
+
+    db = SessionLocal()
+    channel = None
+    try:
+        initial_msg = await websocket.receive_text()
+        initial_data = json.loads(initial_msg)
+        if initial_data.get("type") != "auth" or not initial_data.get("user_id"):
+            await websocket.close(code=1008, reason="Missing or invalid auth")
+            return
+
+        user_id = initial_data["user_id"]
+        current_user = db.query(models.User).filter(models.User.id == user_id).first()
+        counterpart = db.query(models.User).filter(models.User.id == member_id).first()
+
+        if not current_user or not counterpart:
+            await websocket.close(code=1008, reason="Unauthorized")
+            return
+
+        try:
+            manager_id, member_thread_id = _resolve_chat_pair(current_user, counterpart, db)
+        except HTTPException as auth_exc:
+            await websocket.close(code=1008, reason=str(auth_exc.detail))
+            return
+
+        channel = f"member_chat:{manager_id}:{member_thread_id}"
+        manager.connect_to_channel(websocket, channel)
+        logger.info(f"User {user_id} connected to member chat channel {channel}")
+
+        while True:
+            data = await websocket.receive_text()
+            msg_data = json.loads(data)
+
+            if msg_data.get("type") == "chat_message":
+                content = (msg_data.get("content") or "").strip()
+                if not content:
+                    continue
+
+                new_message = models.Message(
+                    task_id=None,
+                    sender_id=user_id,
+                    manager_id=manager_id,
+                    member_id=member_thread_id,
+                    content=content,
+                )
+                db.add(new_message)
+                db.commit()
+                db.refresh(new_message)
+
+                msg_resp = MessageResponse.model_validate(new_message).model_dump(mode="json")
+                await manager.broadcast_channel(channel, {
+                    "type": "chat_message",
+                    "data": msg_resp,
+                })
+
+    except WebSocketDisconnect:
+        logger.info(f"User left member chat channel {channel or 'unknown'}")
+    except Exception as e:
+        logger.error(f"WebSocket member chat error for member {member_id}: {e}")
+        try:
+            await websocket.close(code=1011)
+        except Exception:
+            pass
+    finally:
+        if channel:
+            manager.disconnect_from_channel(websocket, channel)
         db.close()
 
 

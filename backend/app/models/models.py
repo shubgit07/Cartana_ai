@@ -75,8 +75,12 @@ class Message(Base):
     id = Column(Integer, primary_key=True, index=True)
     task_id = Column(Integer, ForeignKey("tasks.id"), index=True)
     sender_id = Column(Integer, ForeignKey("users.id"))
+    manager_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=True)
+    member_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=True)
     content = Column(String)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     task = relationship("Task", back_populates="messages")
-    sender = relationship("User")
+    sender = relationship("User", foreign_keys=[sender_id])
+    manager = relationship("User", foreign_keys=[manager_id])
+    member = relationship("User", foreign_keys=[member_id])

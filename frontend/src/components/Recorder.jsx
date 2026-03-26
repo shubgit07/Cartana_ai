@@ -59,7 +59,7 @@ const Recorder = ({ onJobCreated }) => {
   };
 
   return (
-    <div className="p-4 bg-gray-100 rounded-lg shadow-md text-center">
+    <div className="p-4 bg-[#F5F7FA] rounded-lg shadow-md text-center">
       <h2 className="text-xl font-bold mb-4">Voice input</h2>
       <button 
         onClick={isRecording ? stopRecording : startRecording}

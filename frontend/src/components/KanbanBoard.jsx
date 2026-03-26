@@ -2,7 +2,7 @@ import React from 'react';
 import TaskCard from './TaskCard';
 import { Layout } from 'lucide-react';
 
-export default function KanbanBoard({ tasks, users, currentUser, onTaskUpdate, onTaskDelete }) {
+export default function KanbanBoard({ tasks, users, currentUser, onTaskUpdate, onTaskDelete, onOpenChat }) {
   const columns = [
     { title: 'To Do', status: 'TODO', color: 'bg-slate-400' },
     { title: 'In Progress', status: 'IN_PROGRESS', color: 'bg-blue-500' },
@@ -23,7 +23,7 @@ export default function KanbanBoard({ tasks, users, currentUser, onTaskUpdate, o
                 <h3 className="font-bold text-slate-700 text-[15px] tracking-tight group-hover:text-slate-900 transition-colors">
                   {col.title}
                 </h3>
-                <span className="bg-slate-100 text-slate-500 text-[11px] font-black px-2 py-0.5 rounded-lg border border-slate-200/50">
+                <span className="bg-slate-100 text-slate-500 text-[11px] font-black px-2 py-0.5 rounded-lg border border-[#E5E7EB]/50">
                   {colTasks.length}
                 </span>
               </div>
@@ -34,7 +34,7 @@ export default function KanbanBoard({ tasks, users, currentUser, onTaskUpdate, o
             </div>
             
             {/* Task List Container */}
-            <div className="bg-slate-50/50 rounded-[20px] p-3 border border-slate-200/70 shadow-inner flex flex-col gap-4 overflow-y-auto h-[65vh] lg:h-[70vh] custom-scrollbar">
+            <div className="bg-white/50 rounded-[20px] p-3 border border-[#E5E7EB] shadow-inner flex flex-col gap-4 overflow-y-auto h-[65vh] lg:h-[70vh] custom-scrollbar">
               {colTasks.map(task => (
                 <div key={task.id} className="flex-shrink-0">
                   <TaskCard 
@@ -43,6 +43,7 @@ export default function KanbanBoard({ tasks, users, currentUser, onTaskUpdate, o
                     currentUser={currentUser}
                     onUpdate={onTaskUpdate}
                     onDelete={onTaskDelete}
+                    onOpenChat={onOpenChat}
                   />
                 </div>
               ))}
@@ -50,7 +51,7 @@ export default function KanbanBoard({ tasks, users, currentUser, onTaskUpdate, o
               {colTasks.length === 0 && (
                 <div className="flex-1 flex items-center justify-center p-8 opacity-40">
                   <div className="text-center space-y-3">
-                    <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto border-2 border-dashed border-slate-200">
+                    <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto border-2 border-dashed border-[#E5E7EB]">
                        <div className="w-2 h-2 rounded-full bg-slate-300" />
                     </div>
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">No Tasks</p>

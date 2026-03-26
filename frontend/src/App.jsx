@@ -14,10 +14,13 @@ import {
   Users as UsersIcon,
   FolderKanban,
   Zap,
-  Trash2
+  Trash2,
+  MessageSquare
 } from 'lucide-react';
 import TaskStatus from './components/TaskStatus';
 import KanbanBoard from './components/KanbanBoard';
+import ChatWorkspace from './components/ChatWorkspace';
+import LandingPage from './components/LandingPage';
 
 const API_URL = 'http://localhost:8000';
 
@@ -37,6 +40,10 @@ export default function App() {
   const [expandedNoteIds, setExpandedNoteIds] = useState([]);
   const [noteHeights, setNoteHeights] = useState({});
   const [backendError, setBackendError] = useState(null);
+  const [activeView, setActiveView] = useState('dashboard');
+  const [preferredChatMemberId, setPreferredChatMemberId] = useState(null);
+  const [showLanding, setShowLanding] = useState(true);
+  const isManager = currentUser?.role === 'MANAGER';
   const noteContentRefs = useRef({});
 
   const measureExpandedHeights = () => {
@@ -130,8 +137,40 @@ export default function App() {
       if (currentUser.role === 'MANAGER') {
         fetchNotes();
       }
+      setPreferredChatMemberId(null);
     }
   }, [currentUser]);
+
+  useEffect(() => {
+    if (!isManager) {
+      setPipelineTrace(null);
+      setShowTrace(false);
+      return;
+    }
+
+    if (!notes.length) {
+      setPipelineTrace(null);
+      return;
+    }
+
+    const hasTrace = (trace) => (
+      Boolean(trace && typeof trace === 'object' && Object.keys(trace).length > 0)
+    );
+
+    if (selectedNoteId) {
+      const selectedNote = notes.find((note) => note.id === selectedNoteId);
+      if (selectedNote) {
+        setPipelineTrace(hasTrace(selectedNote.pipeline_trace) ? selectedNote.pipeline_trace : null);
+        return;
+      }
+    }
+
+    const latestNoteWithTrace = [...notes]
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      .find((note) => hasTrace(note.pipeline_trace));
+
+    setPipelineTrace(latestNoteWithTrace ? latestNoteWithTrace.pipeline_trace : null);
+  }, [notes, selectedNoteId, isManager]);
 
   useEffect(() => {
     measureExpandedHeights();
@@ -224,6 +263,10 @@ export default function App() {
     }
   };
 
+  if (showLanding) {
+    return <LandingPage onEnterApp={() => setShowLanding(false)} />;
+  }
+
   if (backendError) {
     return (
       <div className="h-screen w-screen flex flex-col items-center justify-center bg-rose-50 p-6">
@@ -248,10 +291,12 @@ export default function App() {
 
   if (!currentUser) return <div className="h-screen w-screen flex items-center justify-center bg-slate-50 text-slate-400 font-bold animate-pulse">Loading Cartana...</div>;
 
-  const isManager = currentUser.role === 'MANAGER';
+  const hasPipelineTrace = Boolean(
+    pipelineTrace && typeof pipelineTrace === 'object' && Object.keys(pipelineTrace).length > 0
+  );
 
   return (
-    <div className="flex h-screen bg-[#F8FAFC] text-slate-900 font-sans overflow-hidden">
+    <div className="flex h-screen bg-[#F5F7FA] text-[#0F172A] font-sans overflow-hidden">
 
       {/* Sidebar */}
       <aside className="hidden md:flex md:w-64 bg-white border-r border-slate-200 flex-col z-20 shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
@@ -265,7 +310,8 @@ export default function App() {
         </div>
         
         <nav className="flex-1 px-4 space-y-1 overflow-y-auto">
-          <SidebarLink icon={<LayoutDashboard size={20} />} label="Dashboard" active />
+          <SidebarLink icon={<LayoutDashboard size={20} />} label="Dashboard" active={activeView === 'dashboard'} onClick={() => setActiveView('dashboard')} />
+          <SidebarLink icon={<MessageSquare size={20} />} label="Chat" active={activeView === 'chat'} onClick={() => setActiveView('chat')} />
           {isManager && <SidebarLink icon={<FolderKanban size={20} />} label="Workspace" />}
           {isManager && <SidebarLink icon={<UsersIcon size={20} />} label="Team" />}
           <div className="pt-4 pb-2 px-3">
@@ -348,8 +394,24 @@ export default function App() {
         </header>
 
         {/* Scrollable Dashboard Content */}
-        <main className="flex-1 overflow-y-auto bg-[#F8FAFC] p-4 md:p-8 scroll-smooth">
-          <div className="max-w-6xl mx-auto space-y-10">
+        <main className="flex-1 overflow-y-auto bg-[#F5F7FA] p-4 md:p-8 scroll-smooth">
+          {activeView === 'chat' && (
+            <div className="max-w-5xl mx-auto space-y-6">
+              <div className="flex flex-col gap-2">
+                <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">Chat</h1>
+                <p className="text-slate-500 font-medium">
+                  {isManager ? 'Select a team member to open their dedicated conversation.' : 'You can chat with your manager here.'}
+                </p>
+              </div>
+              <ChatWorkspace
+                currentUser={currentUser}
+                preferredMemberId={preferredChatMemberId}
+                onPreferredMemberHandled={() => setPreferredChatMemberId(null)}
+              />
+            </div>
+          )}
+
+          <div className={`max-w-6xl mx-auto space-y-10 ${activeView === 'chat' ? 'hidden' : ''}`}>
             
             <div className="flex flex-col gap-2">
               <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">Main Dashboard</h1>
@@ -360,7 +422,7 @@ export default function App() {
             {isManager && (
               <div className="bg-[linear-gradient(145deg,#f8fbff,#eef2ff)] rounded-[20px] border border-slate-200/80 p-1 overflow-hidden transition-all duration-200 ease-in-out shadow-[0_10px_30px_rgba(15,23,42,0.12)] hover:shadow-[0_14px_34px_rgba(15,23,42,0.16)]">
                 <div className="p-8">
-                  <div className="group flex items-center gap-2 mb-6 text-[#818cf8]">
+                  <div className="group flex items-center gap-2 mb-6 text-[#3B82F6]">
                       <Zap size={20} className="fill-current opacity-80 transition-all duration-200 ease-in-out group-hover:opacity-100" />
                       <span className="text-sm font-semibold uppercase tracking-[2px] text-slate-700">Quick Ingest</span>
                   </div>
@@ -373,7 +435,7 @@ export default function App() {
                       onKeyDown={handleTextKeyDown}
                       spellCheck={false}
                       placeholder="Describe your meeting or project needs here... Cartana will extract the magic details."
-                      className="w-full bg-white/90 border border-slate-300/80 rounded-2xl px-6 py-5 text-base md:text-lg text-slate-800 placeholder:text-slate-400 resize-none focus:border-[#6366f1] focus:shadow-[0_0_0_2px_rgba(99,102,241,0.3)] focus:bg-white transition-all duration-200 ease-in-out outline-none"
+                      className="w-full bg-white/90 border border-[#3B82F6] rounded-2xl px-6 py-5 text-base md:text-lg text-[#0F172A] placeholder:text-slate-400 resize-none focus:border-[#3B82F6] focus:shadow-[0_0_0_2px_rgba(59,130,246,0.3)] focus:bg-white transition-all duration-200 ease-in-out outline-none"
                       rows={4}
                       disabled={isProcessing}
                     />
@@ -388,9 +450,13 @@ export default function App() {
                       id="submit-text-btn"
                       onClick={handleTextSubmit}
                       disabled={isProcessing || !textInput.trim()}
-                      className="group h-12 sm:h-13 px-8 rounded-xl bg-[linear-gradient(135deg,#6366f1,#8b5cf6)] text-white text-sm font-semibold border border-indigo-400/40 hover:bg-[linear-gradient(135deg,#7276ff,#9b68ff)] disabled:bg-none disabled:bg-[#374151] disabled:text-[#9ca3af] disabled:border-slate-600/60 disabled:cursor-not-allowed transition-all duration-200 ease-in-out shadow-[0_8px_20px_rgba(99,102,241,0.4)] hover:-translate-y-[1px] hover:shadow-[0_10px_25px_rgba(99,102,241,0.5)] disabled:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300/60 active:scale-[0.99] inline-flex items-center justify-center gap-2"
+                      className="group relative overflow-hidden h-12 sm:h-13 px-8 rounded-xl bg-[#3B82F6] text-white text-sm font-semibold border border-blue-400/40 hover:bg-blue-400 disabled:bg-[#3B82F6] disabled:text-white disabled:border-blue-400/40 disabled:cursor-not-allowed transition-all duration-200 ease-in-out shadow-[0_4px_14px_rgba(59,130,246,0.3)] hover:-translate-y-[1px] hover:shadow-[0_6px_20px_rgba(59,130,246,0.4)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300/60 active:scale-[0.97] active:bg-blue-300 inline-flex items-center justify-center gap-2"
                     >
-                      Extract Tasks <Send size={16} className="text-[#818cf8] opacity-80 transition-all duration-200 ease-in-out group-hover:opacity-100 group-hover:text-white" />
+                      {/* Pseudo ripple effect on active */}
+                      <span className="absolute inset-0 bg-white/30 opacity-0 active:opacity-100 transition-opacity duration-75 rounded-xl pointer-events-none"></span>
+                      <span className="relative flex items-center gap-2 z-10">
+                        Extract Tasks <Send size={16} className="text-white opacity-90 transition-all duration-200 ease-in-out group-hover:text-white" />
+                      </span>
                     </button>
                   </div>
                 </div>
@@ -508,11 +574,17 @@ export default function App() {
                   </p>
                 </div>
 
-                {pipelineTrace && (
+                {isManager && (
                   <button
-                    onClick={() => setShowTrace(!showTrace)}
+                    onClick={() => {
+                      if (!hasPipelineTrace) return;
+                      setShowTrace(!showTrace);
+                    }}
+                    disabled={!hasPipelineTrace}
                     className={`h-10 px-4 rounded-xl font-bold text-xs uppercase tracking-widest flex items-center gap-2 transition-all border ${
-                      showTrace 
+                      !hasPipelineTrace
+                      ? 'bg-slate-100 text-slate-300 border-slate-200 cursor-not-allowed'
+                      : showTrace 
                       ? 'bg-slate-800 text-white border-slate-800 shadow-lg' 
                       : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300 hover:text-blue-600'
                     }`}
@@ -545,6 +617,10 @@ export default function App() {
                   currentUser={currentUser}
                   onTaskUpdate={handleTaskUpdate}
                   onTaskDelete={handleTaskDelete}
+                  onOpenChat={(memberId) => {
+                    setPreferredChatMemberId(memberId);
+                    setActiveView('chat');
+                  }}
                 />
               </div>
             </div>
@@ -558,10 +634,11 @@ export default function App() {
 
 // ─── Helper Components ──────────────────────────────────────────────
 
-function SidebarLink({ icon, label, active = false, soon = false }) {
+function SidebarLink({ icon, label, active = false, soon = false, onClick }) {
   return (
-    <a 
-      href="#" 
+    <button
+      type="button"
+      onClick={onClick}
       className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all group ${
         active 
         ? 'bg-blue-50 text-blue-700 font-bold shadow-sm' 
@@ -577,7 +654,7 @@ function SidebarLink({ icon, label, active = false, soon = false }) {
       {soon && (
         <span className="text-[9px] font-black bg-slate-100 text-slate-400 px-1.5 py-0.5 rounded-md ml-auto mt-0.5 tracking-tighter">SOON</span>
       )}
-    </a>
+    </button>
   );
 }
 
@@ -643,13 +720,13 @@ function AudioRecorderButton({ onStarted, disabled, currentUserId }) {
       disabled={disabled && !isRecording}
       className={`group h-12 sm:h-13 min-w-[170px] px-6 rounded-xl font-semibold text-sm tracking-wide transition-all duration-200 ease-in-out inline-flex items-center justify-center gap-2.5 border focus-visible:outline-none focus-visible:ring-2 ${
         isRecording
-        ? 'bg-indigo-100 text-indigo-700 border-[#6366f1] hover:bg-indigo-200/80 hover:text-indigo-800 shadow-[0_0_14px_rgba(99,102,241,0.22)] focus-visible:ring-indigo-300/60'
-        : 'bg-white/80 text-[#6366f1] border-[rgba(99,102,241,0.5)] hover:bg-[rgba(99,102,241,0.08)] hover:border-[#6366f1] hover:text-[#4f46e5] shadow-[0_4px_12px_rgba(79,70,229,0.08)] hover:shadow-[0_0_10px_rgba(99,102,241,0.18)] focus-visible:ring-indigo-300/60'
+        ? 'bg-blue-100 text-blue-700 border-[#3B82F6] hover:bg-blue-200/80 hover:text-blue-800 shadow-[0_0_14px_rgba(59,130,246,0.22)] focus-visible:ring-blue-300/60'
+        : 'bg-white/80 text-[#3B82F6] border-[rgba(59,130,246,0.5)] hover:bg-[rgba(59,130,246,0.08)] hover:border-[#3B82F6] hover:text-[#2563EB] shadow-[0_4px_12px_rgba(59,130,246,0.08)] hover:shadow-[0_0_10px_rgba(59,130,246,0.18)] focus-visible:ring-blue-300/60'
       } disabled:bg-slate-200/80 disabled:text-slate-400 disabled:border-slate-300 disabled:shadow-none disabled:cursor-not-allowed`}
     >
-      <div className={`w-2.5 h-2.5 rounded-full ${isRecording ? 'bg-indigo-600 animate-pulse' : 'bg-[#6366f1] opacity-80 group-hover:opacity-100'}`}></div>
+      <div className={`w-2.5 h-2.5 rounded-full ${isRecording ? 'bg-blue-600 animate-pulse' : 'bg-[#3B82F6] opacity-80 group-hover:opacity-100'}`}></div>
       {isRecording ? 'Stop Recording' : 'Record Audio'}
-      <Mic size={18} className={isRecording ? 'text-indigo-700' : 'text-[#6366f1] opacity-80 transition-all duration-200 ease-in-out group-hover:opacity-100'} />
+      <Mic size={18} className={isRecording ? 'text-blue-700' : 'text-[#3B82F6] opacity-80 transition-all duration-200 ease-in-out group-hover:opacity-100'} />
     </button>
   );
 }

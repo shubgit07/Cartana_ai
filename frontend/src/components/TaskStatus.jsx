@@ -69,7 +69,7 @@ const TaskStatus = ({ jobId, onComplete }) => {
     <div className={`rounded-2xl border-2 p-5 transition-all duration-500 ${currentStatus.bg}`}>
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-white rounded-xl shadow-sm border border-slate-100">
+          <div className="p-2 bg-white rounded-xl shadow-sm border border-[#E5E7EB]">
              {currentStatus.icon}
           </div>
           <div>

@@ -2,6 +2,7 @@ import logging
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import inspect, text
 
 from app.api.routes import router
 from app.core.config import settings
@@ -55,11 +56,32 @@ async def enforce_request_size_limit(request: Request, call_next):
 app.include_router(router)
 
 
+def _ensure_message_chat_columns() -> None:
+    inspector = inspect(engine)
+    column_names = {col["name"] for col in inspector.get_columns("messages")}
+
+    with engine.begin() as conn:
+        if "manager_id" not in column_names:
+            conn.execute(text("ALTER TABLE messages ADD COLUMN manager_id INTEGER"))
+            conn.execute(text("ALTER TABLE messages ADD CONSTRAINT fk_messages_manager_id_users FOREIGN KEY (manager_id) REFERENCES users (id)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_messages_manager_id ON messages (manager_id)"))
+            logger.info("Added manager_id column to messages table")
+
+        if "member_id" not in column_names:
+            conn.execute(text("ALTER TABLE messages ADD COLUMN member_id INTEGER"))
+            conn.execute(text("ALTER TABLE messages ADD CONSTRAINT fk_messages_member_id_users FOREIGN KEY (member_id) REFERENCES users (id)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_messages_member_id ON messages (member_id)"))
+            logger.info("Added member_id column to messages table")
+
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_messages_manager_member_created_at ON messages (manager_id, member_id, created_at)"))
+
+
 @app.on_event("startup")
 def on_startup():
     """Create DB tables and ensure default users exist."""
     logger.info("Running startup: creating database tables...")
     Base.metadata.create_all(bind=engine)
+    _ensure_message_chat_columns()
     logger.info("Database tables ready.")
 
     db = SessionLocal()

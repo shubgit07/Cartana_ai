@@ -10,13 +10,11 @@ import {
   User,
   MessageSquare
 } from 'lucide-react';
-import TaskChat from './TaskChat';
 
-const TaskCard = ({ task, users = [], currentUser, onUpdate, onDelete }) => {
+const TaskCard = ({ task, users = [], currentUser, onUpdate, onDelete, onOpenChat }) => {
   if (!task) return null;
 
   const [isEditing, setIsEditing] = useState(false);
-  const [showChat, setShowChat] = useState(false);
   const [formData, setFormData] = useState({
     title: task.title || '',
     description: task.description || '',
@@ -61,10 +59,6 @@ const TaskCard = ({ task, users = [], currentUser, onUpdate, onDelete }) => {
   };
 
   const manager = users.find((u) => u.role === 'MANAGER');
-  const connectedWith = currentUser?.role === 'MANAGER'
-    ? (task.assignee?.username || 'Assigned member')
-    : (manager?.username || 'Manager');
-
   if (isEditing) {
     return (
       <div className="bg-white border-2 border-blue-500 shadow-xl rounded-[20px] p-4 animate-in fade-in zoom-in-95 duration-200">
@@ -123,7 +117,7 @@ const TaskCard = ({ task, users = [], currentUser, onUpdate, onDelete }) => {
   }
 
   return (
-    <div className="group bg-white border border-slate-200/80 shadow-[0_2px_4px_rgba(15,23,42,0.03)] hover:shadow-[0_10px_24px_rgba(15,23,42,0.08)] hover:border-blue-200 rounded-[20px] p-4 transition-all duration-300 relative overflow-hidden h-full flex flex-col gap-3.5">
+    <div className="group bg-white border border-[#E5E7EB] shadow-[0_2px_4px_rgba(15,23,42,0.03)] hover:shadow-[0_10px_24px_rgba(15,23,42,0.08)] hover:border-[#3B82F6] rounded-[20px] p-4 transition-all duration-300 relative overflow-hidden h-full flex flex-col gap-3.5">
       {/* Decorative Gradient Background (Hover) */}
       <div className="absolute top-0 right-0 w-28 h-28 bg-blue-50/70 rounded-full blur-3xl -mr-14 -mt-14 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
 
@@ -175,8 +169,12 @@ const TaskCard = ({ task, users = [], currentUser, onUpdate, onDelete }) => {
           </div>
           <div className="w-1 h-1 rounded-full bg-slate-200 flex-shrink-0" />
           <button 
-            onClick={(e) => { e.stopPropagation(); setShowChat(!showChat); }}
-            className={`h-7 w-7 inline-flex items-center justify-center rounded-md border transition-all ${showChat ? 'text-blue-600 border-blue-200 bg-blue-50 shadow-sm' : 'text-slate-500 border-slate-200 hover:text-blue-600 hover:bg-slate-50 hover:border-blue-200'}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              const targetMemberId = currentUser?.role === 'MANAGER' ? task.assignee_id : manager?.id;
+              if (targetMemberId && onOpenChat) onOpenChat(targetMemberId);
+            }}
+            className="h-7 w-7 inline-flex items-center justify-center rounded-md border transition-all text-slate-500 border-[#E5E7EB] hover:text-[#3B82F6] hover:bg-slate-50 hover:border-blue-200"
             title="Open task chat"
             aria-label="Open task chat"
           >
@@ -185,7 +183,7 @@ const TaskCard = ({ task, users = [], currentUser, onUpdate, onDelete }) => {
         </div>
 
         {/* Move Controls */}
-        <div className="flex items-center gap-0.5 h-7 px-0.5 bg-slate-50/50 rounded-lg border border-slate-100 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0">
+        <div className="flex items-center gap-0.5 h-7 px-0.5 bg-slate-50/50 rounded-lg border border-[#E5E7EB] opacity-0 group-hover:opacity-100 transition-all flex-shrink-0">
           {task.status !== 'TODO' && (
             <button onClick={(e) => { e.stopPropagation(); handleMove('prev'); }} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-white rounded-md transition-colors">
               <ArrowLeft size={12} />
@@ -200,23 +198,6 @@ const TaskCard = ({ task, users = [], currentUser, onUpdate, onDelete }) => {
         </div>
       </div>
 
-      {showChat && (
-        <>
-          <div
-            className="fixed inset-0 bg-slate-900/25 backdrop-blur-[1px] z-40"
-            onClick={() => setShowChat(false)}
-          />
-          <div className="fixed top-0 right-0 h-full w-full sm:w-[420px] z-50 shadow-2xl border-l border-slate-200 bg-white animate-in slide-in-from-right duration-200">
-            <TaskChat
-              task={task}
-              currentUser={currentUser}
-              connectedWith={connectedWith}
-              onClose={() => setShowChat(false)}
-              onTaskUpdated={(updatedTask) => onUpdate(task.id, updatedTask)}
-            />
-          </div>
-        </>
-      )}
     </div>
   );
 };

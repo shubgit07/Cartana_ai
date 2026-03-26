@@ -84,10 +84,18 @@ class MessageResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    task_id: int
+    task_id: Optional[int] = None
     sender_id: int
+    manager_id: Optional[int] = None
+    member_id: Optional[int] = None
     content: str
     created_at: datetime
     
     # Include sender details
     sender: Optional[UserResponse] = None
+
+
+class ChatThreadMemberResponse(BaseModel):
+    member: UserResponse
+    last_message_at: Optional[datetime] = None
+    last_message_preview: Optional[str] = None
