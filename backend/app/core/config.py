@@ -7,6 +7,8 @@ class Settings(BaseSettings):
     LLM_API_KEY: str = ""
     GROQ_API_KEY: str = ""
     LLM_MODEL: str = "gpt-4o-mini"
+    EXTRACTION_MODEL: str = "llama-3.3-70b-versatile"
+    STT_MODEL: str = "whisper-large-v3"
     CORS_ALLOW_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000"
     CORS_ALLOW_CREDENTIALS: bool = True
     MAX_REQUEST_SIZE_MB: int = 25

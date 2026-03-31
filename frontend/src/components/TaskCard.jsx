@@ -29,11 +29,11 @@ const TaskCard = ({ task, users = [], currentUser, onUpdate, onDelete, onOpenCha
   };
 
   const handleMove = (direction) => {
-    const statuses = ['TODO', 'IN_PROGRESS', 'DONE'];
+    const statuses = ['NEEDS_REVIEW', 'TODO', 'IN_PROGRESS', 'DONE'];
     const currentIndex = statuses.indexOf(task.status);
     let newIndex = currentIndex;
     
-    if (direction === 'next' && currentIndex < 2) newIndex++;
+    if (direction === 'next' && currentIndex < statuses.length - 1) newIndex++;
     if (direction === 'prev' && currentIndex > 0) newIndex--;
     
     if (newIndex !== currentIndex) {
@@ -184,12 +184,12 @@ const TaskCard = ({ task, users = [], currentUser, onUpdate, onDelete, onOpenCha
 
         {/* Move Controls */}
         <div className="flex items-center gap-0.5 h-7 px-0.5 bg-slate-50/50 rounded-lg border border-[#E5E7EB] opacity-0 group-hover:opacity-100 transition-all flex-shrink-0">
-          {task.status !== 'TODO' && (
+          {task.status !== 'NEEDS_REVIEW' && (
             <button onClick={(e) => { e.stopPropagation(); handleMove('prev'); }} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-white rounded-md transition-colors">
               <ArrowLeft size={12} />
             </button>
           )}
-          {task.status !== 'TODO' && task.status !== 'DONE' && <div className="w-px h-2.5 bg-slate-200 mx-0.5" />}
+          {task.status !== 'NEEDS_REVIEW' && task.status !== 'DONE' && <div className="w-px h-2.5 bg-slate-200 mx-0.5" />}
           {task.status !== 'DONE' && (
             <button onClick={(e) => { e.stopPropagation(); handleMove('next'); }} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-white rounded-md transition-colors">
               <ArrowRight size={12} />

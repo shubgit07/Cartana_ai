@@ -19,6 +19,7 @@ class NoteStatus(str, enum.Enum):
 
 
 class TaskStatus(str, enum.Enum):
+    NEEDS_REVIEW = "NEEDS_REVIEW"
     TODO = "TODO"
     IN_PROGRESS = "IN_PROGRESS"
     DONE = "DONE"

@@ -49,12 +49,12 @@ class TaskPipeline:
             for i, sentence in enumerate(task_sentences):
                 try:
                     entities = extract_entities(sentence)
-                    deadline_text = entities.get("deadline_text")
+                    deadline_text = entities.deadline_text
                     deadline_dt = normalize_date(deadline_text)
-                    priority = normalize_priority(entities.get("priority", "medium"))
+                    priority = normalize_priority(entities.priority)
                     
                     # Map assignee_name to assignee_id
-                    assignee_name = entities.get("assignee_name")
+                    assignee_name = entities.assignee_name
                     assignee_id = user_id  # Default to the creator (usually Manager)
                     
                     if assignee_name:
@@ -71,20 +71,25 @@ class TaskPipeline:
 
                     item_trace = {
                         "sentence": sentence,
-                        "entities": entities,
+                        "entities": entities.model_dump(),
+                        "confidence": entities.confidence,
+                        "needs_review": entities.needs_review,
                         "normalized_deadline": deadline_dt.isoformat() if deadline_dt else None,
                         "normalized_priority": priority,
                         "mapped_assignee_id": assignee_id
                     }
                     extracted_items.append(item_trace)
 
+                    task_status = models.TaskStatus.NEEDS_REVIEW if entities.needs_review else models.TaskStatus.TODO
+                    task_title = entities.title if entities.title else f"Needs review: {sentence[:80]}"
+
                     new_task = models.Task(
-                        title=entities.get("title", "Untitled Task"),
-                        description=entities.get("description", sentence),
+                        title=task_title,
+                        description=entities.description,
                         priority=priority,
                         deadline=deadline_dt,
                         deadline_raw=deadline_text,
-                        status=models.TaskStatus.TODO,
+                        status=task_status,
                         assignee_id=assignee_id,
                         note_id=note.id,
                     )

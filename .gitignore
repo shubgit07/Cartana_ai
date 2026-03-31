@@ -32,3 +32,5 @@ celerybeat.pid
 # OS specific
 .DS_Store
 Thumbs.db
+readmeonboard.md
+

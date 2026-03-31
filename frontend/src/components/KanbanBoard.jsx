@@ -4,6 +4,7 @@ import { Layout } from 'lucide-react';
 
 export default function KanbanBoard({ tasks, users, currentUser, onTaskUpdate, onTaskDelete, onOpenChat }) {
   const columns = [
+    { title: 'Needs Review', status: 'NEEDS_REVIEW', color: 'bg-rose-400' },
     { title: 'To Do', status: 'TODO', color: 'bg-slate-400' },
     { title: 'In Progress', status: 'IN_PROGRESS', color: 'bg-blue-500' },
     { title: 'Done', status: 'DONE', color: 'bg-emerald-500' }

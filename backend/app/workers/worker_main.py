@@ -10,7 +10,13 @@ import os
 logger = logging.getLogger(__name__)
 
 
-@celery_app.task(name="run_task_pipeline", bind=True)
+@celery_app.task(
+    name="run_task_pipeline",
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    max_retries=3,
+)
 def run_task_pipeline(self, note_id: int, user_id: int = 1, text: str = None, audio_path: str = None):
     db = SessionLocal()
     try:
