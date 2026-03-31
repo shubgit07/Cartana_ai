@@ -25,7 +25,7 @@ Input -> FastAPI -> Redis queue -> Celery worker -> AI + normalization -> Postgr
 
 - Backend: FastAPI, SQLAlchemy, Celery, Redis, PostgreSQL
 - Frontend: React, Vite, Tailwind CSS, Axios
-- AI: Groq LLM + Whisper STT
+- AI: Extraction LLM + Whisper STT
 - Realtime: WebSockets
 - DevOps: Docker Compose
 
