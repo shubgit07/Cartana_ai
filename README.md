@@ -2,10 +2,6 @@
 
 Cartana AI converts manager voice/text input into structured, assignable tasks through an asynchronous AI pipeline.
 
-This project is designed as a practical systems-engineering showcase: typed LLM boundaries, queue-based background processing, role-aware APIs, and real-time collaboration.
-
-## What I Built
-
 - End-to-end voice/text -> task workflow with traceable multi-stage processing
 - Structured extraction via tool/function-calling and Pydantic validation
 - Confidence-aware routing of uncertain output to `NEEDS_REVIEW`
@@ -104,8 +100,6 @@ npm run dev
 - Frontend API/WS base URLs are localhost-focused and should be environment-driven for deployment.
 
 ## Repository Notes
-
-- Deep backend walkthrough: `readmeonboard.md`
 - Core backend code: `backend/app`
 - Frontend components: `frontend/src/components`
 
