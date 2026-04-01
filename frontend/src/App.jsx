@@ -143,7 +143,7 @@ function CTAs({ dark = false, className = "", large = false }) {
         Watch Demo
       </a>
       <a
-        href="https://github.com/"
+        href="https://github.com/shubgit07/Cartana_ai"
         target="_blank"
         rel="noreferrer"
         className={`inline-flex items-center gap-2 rounded-xl text-sm font-semibold transition ${secondary} ${sizeClasses}`}
