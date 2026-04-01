@@ -1,732 +1,644 @@
-import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
-import { 
-  Home, 
-  Briefcase, 
-  Settings, 
-  ListTodo, 
-  Activity, 
-  Mic, 
-  Send, 
-  ChevronDown, 
-  User as UserIcon,
+import { useEffect, useRef, useState } from "react";
+import { motion } from "framer-motion";
+import {
+  Activity,
+  ArrowRight,
+  BrainCircuit,
+  Clock3,
+  Cpu,
+  FileText,
+  Github,
+  Layers,
   LayoutDashboard,
-  Users as UsersIcon,
-  FolderKanban,
+  MessageSquare,
+  Mic,
+  Play,
+  Radio,
+  RefreshCw,
+  ShieldAlert,
+  ShieldCheck,
+  Sparkles,
+  Users,
   Zap,
-  Trash2,
-  MessageSquare
-} from 'lucide-react';
-import TaskStatus from './components/TaskStatus';
-import KanbanBoard from './components/KanbanBoard';
-import ChatWorkspace from './components/ChatWorkspace';
-import LandingPage from './components/LandingPage';
+} from "lucide-react";
+import ManagerDashboard from "./components/ManagerDashboard";
 
-const API_URL = 'http://localhost:8000';
+const DEMO_URL = "https://youtu.be/UhGXqdEFmm4";
+const HERO_VIDEO_SRC = "/assets/whisk.mp4";
 
-export default function App() {
-  const [users, setUsers] = useState([]);
-  const [currentUser, setCurrentUser] = useState(null);
-  const [jobId, setJobId] = useState(null);
-  const [noteId, setNoteId] = useState(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [tasks, setTasks] = useState([]);
-  const [pipelineTrace, setPipelineTrace] = useState(null);
-  const [showTrace, setShowTrace] = useState(false);
-  const [textInput, setTextInput] = useState('');
-  const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
-  const [notes, setNotes] = useState([]);
-  const [selectedNoteId, setSelectedNoteId] = useState(null);
-  const [expandedNoteIds, setExpandedNoteIds] = useState([]);
-  const [noteHeights, setNoteHeights] = useState({});
-  const [backendError, setBackendError] = useState(null);
-  const [activeView, setActiveView] = useState('dashboard');
-  const [preferredChatMemberId, setPreferredChatMemberId] = useState(null);
-  const [showLanding, setShowLanding] = useState(true);
-  const isManager = currentUser?.role === 'MANAGER';
-  const noteContentRefs = useRef({});
+const problemCards = [
+  {
+    icon: FileText,
+    title: "Notes Go Nowhere",
+    description: "Action items stay buried in meeting notes and Slack threads.",
+  },
+  {
+    icon: Users,
+    title: "Ownership Gaps",
+    description: "Tasks fall through when no one is explicitly assigned.",
+  },
+  {
+    icon: Clock3,
+    title: "Manual Overhead",
+    description: "Managers spend time re-explaining instead of shipping.",
+  },
+];
 
-  const measureExpandedHeights = () => {
-    setNoteHeights((prev) => {
-      const next = { ...prev };
-      expandedNoteIds.forEach((id) => {
-        const el = noteContentRefs.current[id];
-        if (el) {
-          next[id] = el.scrollHeight;
+const workflowSteps = [
+  {
+    title: "Capture Input",
+    description: "Submit a voice recording or typed note from your meeting.",
+    icon: "dual",
+  },
+  {
+    title: "AI Extraction",
+    description: "The async pipeline transcribes, parses, and extracts structured tasks.",
+    icon: Cpu,
+  },
+  {
+    title: "Review Gate",
+    description: "Low-confidence tasks are flagged for human review before entering the board.",
+    icon: ShieldCheck,
+  },
+  {
+    title: "Execute & Collaborate",
+    description: "Tasks land in the Kanban. Team communicates via real-time chat.",
+    icon: LayoutDashboard,
+  },
+];
+
+const stackGroups = [
+  {
+    label: "Backend",
+    items: ["FastAPI", "SQLAlchemy", "Celery", "Redis", "PostgreSQL"],
+  },
+  {
+    label: "Frontend",
+    items: ["React", "Vite", "Tailwind CSS"],
+  },
+  {
+    label: "AI",
+    items: ["OpenAI LLM (function calling)", "Whisper (transcription)"],
+  },
+  {
+    label: "Realtime",
+    items: ["WebSockets"],
+  },
+  {
+    label: "DevOps",
+    items: ["Docker Compose"],
+  },
+];
+
+function useInView(threshold = 0.2, rootMargin = "0px 0px -10% 0px") {
+  const ref = useRef(null);
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+          observer.unobserve(entry.target);
         }
-      });
-      return next;
-    });
-  };
-
-  const toggleNoteExpansion = (id) => {
-    setExpandedNoteIds((prev) => (
-      prev.includes(id) ? prev.filter((noteId) => noteId !== id) : [...prev, id]
-    ));
-  };
-
-  const fetchUsers = async () => {
-    try {
-      console.log("Fetching users from:", `${API_URL}/users`);
-      const response = await axios.get(`${API_URL}/users`);
-      console.log("Fetched users response:", response);
-      
-      const userData = response.data;
-      if (userData && Array.isArray(userData)) {
-        setUsers(userData);
-        setBackendError(null);
-        if (userData.length > 0 && !currentUser) {
-          setCurrentUser(userData[0]);
-          console.log("Setting initial currentUser:", userData[0]);
-        } else if (userData.length === 0) {
-          setBackendError("No users found in database. Seed logic might have failed.");
-        }
-      } else {
-        console.error("Malformed user data received:", userData);
-        setBackendError("Received malformed data from server. Please check backend logs.");
-      }
-    } catch (error) {
-      console.error("Failed to fetch users", error);
-      const msg = error.response ? `Server Error: ${error.response.status}` : error.message;
-      setBackendError(`Backend Connection Failed: ${msg}. Is the server running on port 8000?`);
-    }
-  };
-
-  const fetchTasks = async (userId) => {
-    try {
-      const url = userId ? `${API_URL}/tasks?user_id=${userId}` : `${API_URL}/tasks`;
-      const response = await axios.get(url);
-      setTasks(response.data);
-      setBackendError(null);
-    } catch (error) {
-      console.error("Failed to fetch tasks", error);
-      setBackendError(`Task Fetch Failed: ${error.message}`);
-    }
-  };
-
-  const fetchNotes = async () => {
-    try {
-      const response = await axios.get(`${API_URL}/notes`);
-      setNotes(response.data);
-    } catch (error) {
-      console.error("Failed to fetch notes", error);
-    }
-  };
-
-  const fetchNoteData = async (id) => {
-    try {
-      const response = await axios.get(`${API_URL}/notes/${id}`);
-      const note = response.data;
-      setPipelineTrace(note.pipeline_trace || null);
-      setSelectedNoteId(id);
-      // Refresh the notes list to update status
-      fetchNotes();
-    } catch (error) {
-      console.error("Failed to fetch note data", error);
-    }
-  };
-
-  useEffect(() => {
-    fetchUsers();
-    fetchNotes();
-  }, []);
-
-  useEffect(() => {
-    if (currentUser) {
-      fetchTasks(currentUser.id);
-      if (currentUser.role === 'MANAGER') {
-        fetchNotes();
-      }
-      setPreferredChatMemberId(null);
-    }
-  }, [currentUser]);
-
-  useEffect(() => {
-    if (!isManager) {
-      setPipelineTrace(null);
-      setShowTrace(false);
-      return;
-    }
-
-    if (!notes.length) {
-      setPipelineTrace(null);
-      return;
-    }
-
-    const hasTrace = (trace) => (
-      Boolean(trace && typeof trace === 'object' && Object.keys(trace).length > 0)
+      },
+      { threshold, rootMargin }
     );
 
-    if (selectedNoteId) {
-      const selectedNote = notes.find((note) => note.id === selectedNoteId);
-      if (selectedNote) {
-        setPipelineTrace(hasTrace(selectedNote.pipeline_trace) ? selectedNote.pipeline_trace : null);
-        return;
-      }
-    }
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [threshold, rootMargin]);
 
-    const latestNoteWithTrace = [...notes]
-      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-      .find((note) => hasTrace(note.pipeline_trace));
+  return [ref, isVisible];
+}
 
-    setPipelineTrace(latestNoteWithTrace ? latestNoteWithTrace.pipeline_trace : null);
-  }, [notes, selectedNoteId, isManager]);
-
-  useEffect(() => {
-    measureExpandedHeights();
-  }, [expandedNoteIds, notes]);
-
-  useEffect(() => {
-    const handleResize = () => measureExpandedHeights();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [expandedNoteIds]);
-
-  const handleTaskUpdate = async (id, updateData) => {
-    try {
-      await axios.patch(`${API_URL}/tasks/${id}`, updateData);
-      fetchTasks(currentUser?.id);
-    } catch (error) {
-      console.error("Failed to update task", error);
-    }
-  };
-
-  const handleTaskDelete = async (id) => {
-    try {
-      await axios.delete(`${API_URL}/tasks/${id}`);
-      fetchTasks(currentUser?.id);
-    } catch (error) {
-      console.error("Failed to delete task", error);
-    }
-  };
-
-  const handleNoteDelete = async (e, id) => {
-    e.stopPropagation(); // Don't trigger note selection
-    if (!window.confirm("Delete this input from history? (Tasks will remain untouched)")) return;
-    
-    try {
-      await axios.delete(`${API_URL}/notes/${id}`);
-      // Optimistically update UI
-      setNotes(prev => prev.filter(n => n.id !== id));
-      if (selectedNoteId === id) {
-        setSelectedNoteId(null);
-        setPipelineTrace(null);
-        setShowTrace(false);
-      }
-    } catch (error) {
-      console.error("Failed to delete note", error);
-    }
-  };
-
-  const handleJobComplete = async () => {
-    setIsProcessing(false);
-    fetchTasks(currentUser?.id);
-    fetchNotes();
-    if (noteId) {
-      await fetchNoteData(noteId);
-    }
-  };
-
-  const onProcessingStarted = (data) => {
-    setJobId(data.job_id);
-    setNoteId(data.note_id);
-    setIsProcessing(true);
-    setPipelineTrace(null);
-    setShowTrace(false);
-    fetchNotes(); // Refresh list to show the new pending note
-  };
-
-  const handleTextSubmit = async () => {
-    if (!textInput.trim() || !currentUser) return;
-
-    const formData = new FormData();
-    formData.append('user_id', currentUser.id.toString());
-    formData.append('text', textInput.trim());
-
-    try {
-      const response = await axios.post(`${API_URL}/process-input`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      if (response.data) {
-        onProcessingStarted(response.data);
-        setTextInput('');
-      }
-    } catch (err) {
-      console.error("Error submitting text", err);
-    }
-  };
-
-  const handleTextKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleTextSubmit();
-    }
-  };
-
-  if (showLanding) {
-    return <LandingPage onEnterApp={() => setShowLanding(false)} />;
-  }
-
-  if (backendError) {
-    return (
-      <div className="h-screen w-screen flex flex-col items-center justify-center bg-rose-50 p-6">
-        <div className="bg-white p-8 rounded-[32px] shadow-2xl border border-rose-100 max-w-md w-full text-center space-y-6">
-          <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
-             <Activity size={32} />
-          </div>
-          <h1 className="text-2xl font-black text-slate-800 tracking-tight">Backend Unreachable</h1>
-          <p className="text-slate-500 font-medium leading-relaxed">
-            {backendError}
-          </p>
-          <button 
-            onClick={() => { setBackendError(null); fetchUsers(); }}
-            className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all active:scale-95"
-          >
-            Retry Connection
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!currentUser) return <div className="h-screen w-screen flex items-center justify-center bg-slate-50 text-slate-400 font-bold animate-pulse">Loading Cartana...</div>;
-
-  const hasPipelineTrace = Boolean(
-    pipelineTrace && typeof pipelineTrace === 'object' && Object.keys(pipelineTrace).length > 0
+function Pill({ children, className = "" }) {
+  return (
+    <span
+      className={`inline-flex items-center rounded-full border border-slate-300/90 bg-white/85 px-4 py-1 text-xs font-semibold tracking-wide text-slate-500 ${className}`}
+    >
+      {children}
+    </span>
   );
+}
+
+function CTAs({ dark = false, className = "", large = false }) {
+  const secondary = dark
+    ? "border border-white/50 text-white hover:bg-white/10"
+    : "border border-slate-300 text-slate-700 hover:border-slate-400 hover:bg-white";
+  const sizeClasses = large ? "px-8 py-4" : "px-5 py-3";
 
   return (
-    <div className="flex h-screen bg-[#F5F7FA] text-[#0F172A] font-sans overflow-hidden">
+    <div className={`flex flex-wrap items-center gap-3 ${className}`}>
+      <a
+        href={DEMO_URL}
+        target="_blank"
+        rel="noreferrer"
+        className={`inline-flex items-center gap-2 rounded-xl bg-[#2563EB] text-sm font-semibold text-white transition hover:bg-[#3B82F6] ${sizeClasses}`}
+      >
+        <Play size={15} className="fill-current" />
+        Watch Demo
+      </a>
+      <a
+        href="https://github.com/"
+        target="_blank"
+        rel="noreferrer"
+        className={`inline-flex items-center gap-2 rounded-xl text-sm font-semibold transition ${secondary} ${sizeClasses}`}
+      >
+        <Github size={16} />
+        View on GitHub
+      </a>
+    </div>
+  );
+}
 
-      {/* Sidebar */}
-      <aside className="hidden md:flex md:w-64 bg-white border-r border-slate-200 flex-col z-20 shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
-        <div className="p-6 mb-2 flex items-center gap-3">
-          <div className="bg-blue-600 p-2 rounded-xl shadow-md shadow-blue-200">
-            <Zap className="text-white w-5 h-5 fill-current" />
-          </div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-800">
-            Cartana <span className="text-blue-600 text-sm font-medium ml-1">AI</span>
-          </h1>
-        </div>
-        
-        <nav className="flex-1 px-4 space-y-1 overflow-y-auto">
-          <SidebarLink icon={<LayoutDashboard size={20} />} label="Dashboard" active={activeView === 'dashboard'} onClick={() => setActiveView('dashboard')} />
-          <SidebarLink icon={<MessageSquare size={20} />} label="Chat" active={activeView === 'chat'} onClick={() => setActiveView('chat')} />
-          {isManager && <SidebarLink icon={<FolderKanban size={20} />} label="Workspace" />}
-          {isManager && <SidebarLink icon={<UsersIcon size={20} />} label="Team" />}
-          <div className="pt-4 pb-2 px-3">
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Project Tools</p>
-          </div>
-          <SidebarLink icon={<ListTodo size={20} />} label="My Tasks" />
-          <SidebarLink icon={<Activity size={20} />} label="Analytics" soon />
-          <SidebarLink icon={<Settings size={20} />} label="Settings" soon />
-        </nav>
+function RevealSection({ id, className = "", children }) {
+  const [sectionRef, isVisible] = useInView(0.16);
+  return (
+    <section
+      id={id}
+      ref={sectionRef}
+      className={`reveal-section ${isVisible ? "is-visible" : ""} ${className}`}
+    >
+      {children}
+    </section>
+  );
+}
 
-        <div className="p-4 mt-auto border-t border-slate-100">
-          <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100">
-            <p className="text-xs font-semibold text-blue-700 mb-1 font-mono">MVP STATUS</p>
-            <p className="text-[11px] text-blue-600 leading-relaxed">
-              Phase 1.0 Complete. <br/>Ready for Phase 1.5.
-            </p>
-          </div>
-        </div>
-      </aside>
+function HeroMockup() {
+  const [mockupRef, isVisible] = useInView(0.2);
+  const videoRef = useRef(null);
 
-      {/* Main Area */}
-      <div className="flex-1 flex flex-col relative overflow-hidden">
-        
-        {/* Header */}
-        <header className="h-18 min-h-[72px] bg-white/85 backdrop-blur-md border-b border-slate-200 px-4 md:px-8 flex items-center justify-between sticky top-0 z-10">
-          <div className="flex items-center gap-3">
-            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-            <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-widest">Active Workspace</h2>
-          </div>
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
 
-          <div className="flex items-center gap-6">
-            <div className="relative">
-              <button 
-                onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
-                className="flex items-center gap-3 px-4 py-2 rounded-full hover:bg-slate-50 border border-slate-200 transition-all active:scale-95 group"
-              >
-                <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm shadow-sm uppercase">
-                  {currentUser.username.charAt(0)}
-                </div>
-                <div className="text-left">
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter -mb-1">View as:</p>
-                  <p className="text-sm font-semibold text-slate-700">{currentUser.username}</p>
-                </div>
-                <ChevronDown size={16} className={`text-slate-400 transition-transform ${isUserDropdownOpen ? 'rotate-180' : ''}`} />
-              </button>
+    if (isVisible) {
+      const playPromise = video.play();
+      if (playPromise && typeof playPromise.catch === "function") {
+        playPromise.catch(() => {});
+      }
+      return;
+    }
 
-              {isUserDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
-                  <div className="p-2">
-                    {users.map((user) => (
-                      <button
-                        key={user.id}
-                        onClick={() => {
-                          setCurrentUser(user);
-                          setIsUserDropdownOpen(false);
-                        }}
-                        className={`w-full flex items-center gap-3 p-2.5 rounded-xl text-sm font-medium transition-colors ${
-                          currentUser.id === user.id ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'
-                        }`}
-                      >
-                        <div className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs uppercase ${
-                          currentUser.id === user.id ? 'bg-blue-200 text-blue-700' : 'bg-slate-100 text-slate-500'
-                        }`}>
-                          {user.username.charAt(0)}
-                        </div>
-                        {user.username}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            <div className="h-6 w-px bg-slate-200"></div>
+    video.pause();
+  }, [isVisible]);
 
-            <button className="w-10 h-10 rounded-full border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 transition-colors">
-              <UserIcon size={20} />
-            </button>
-          </div>
-        </header>
-
-        {/* Scrollable Dashboard Content */}
-        <main className="flex-1 overflow-y-auto bg-[#F5F7FA] p-4 md:p-8 scroll-smooth">
-          {activeView === 'chat' && (
-            <div className="max-w-5xl mx-auto space-y-6">
-              <div className="flex flex-col gap-2">
-                <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">Chat</h1>
-                <p className="text-slate-500 font-medium">
-                  {isManager ? 'Select a team member to open their dedicated conversation.' : 'You can chat with your manager here.'}
-                </p>
-              </div>
-              <ChatWorkspace
-                currentUser={currentUser}
-                preferredMemberId={preferredChatMemberId}
-                onPreferredMemberHandled={() => setPreferredChatMemberId(null)}
-              />
-            </div>
-          )}
-
-          <div className={`max-w-6xl mx-auto space-y-10 ${activeView === 'chat' ? 'hidden' : ''}`}>
-            
-            <div className="flex flex-col gap-2">
-              <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">Main Dashboard</h1>
-              <p className="text-slate-500 font-medium">Capture ideas and orchestrate your tasks with AI.</p>
-            </div>
-
-            {/* Input Section - Refined Card */}
-            {isManager && (
-              <div className="bg-[linear-gradient(145deg,#f8fbff,#eef2ff)] rounded-[20px] border border-slate-200/80 p-1 overflow-hidden transition-all duration-200 ease-in-out shadow-[0_10px_30px_rgba(15,23,42,0.12)] hover:shadow-[0_14px_34px_rgba(15,23,42,0.16)]">
-                <div className="p-8">
-                  <div className="group flex items-center gap-2 mb-6 text-[#3B82F6]">
-                      <Zap size={20} className="fill-current opacity-80 transition-all duration-200 ease-in-out group-hover:opacity-100" />
-                      <span className="text-sm font-semibold uppercase tracking-[2px] text-slate-700">Quick Ingest</span>
-                  </div>
-
-                  <div className="relative group">
-                    <textarea
-                      id="text-input"
-                      value={textInput}
-                      onChange={(e) => setTextInput(e.target.value)}
-                      onKeyDown={handleTextKeyDown}
-                      spellCheck={false}
-                      placeholder="Describe your meeting or project needs here... Cartana will extract the magic details."
-                      className="w-full bg-white/90 border border-[#3B82F6] rounded-2xl px-6 py-5 text-base md:text-lg text-[#0F172A] placeholder:text-slate-400 resize-none focus:border-[#3B82F6] focus:shadow-[0_0_0_2px_rgba(59,130,246,0.3)] focus:bg-white transition-all duration-200 ease-in-out outline-none"
-                      rows={4}
-                      disabled={isProcessing}
-                    />
-                  </div>
-                  
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mt-6 gap-4">
-                    <div className="flex items-center gap-3">
-                      <AudioRecorderButton onStarted={onProcessingStarted} disabled={isProcessing} currentUserId={currentUser.id} />
-                    </div>
-                    
-                    <button
-                      id="submit-text-btn"
-                      onClick={handleTextSubmit}
-                      disabled={isProcessing || !textInput.trim()}
-                      className="group relative overflow-hidden h-12 sm:h-13 px-8 rounded-xl bg-[#3B82F6] text-white text-sm font-semibold border border-blue-400/40 hover:bg-blue-400 disabled:bg-[#3B82F6] disabled:text-white disabled:border-blue-400/40 disabled:cursor-not-allowed transition-all duration-200 ease-in-out shadow-[0_4px_14px_rgba(59,130,246,0.3)] hover:-translate-y-[1px] hover:shadow-[0_6px_20px_rgba(59,130,246,0.4)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300/60 active:scale-[0.97] active:bg-blue-300 inline-flex items-center justify-center gap-2"
-                    >
-                      {/* Pseudo ripple effect on active */}
-                      <span className="absolute inset-0 bg-white/30 opacity-0 active:opacity-100 transition-opacity duration-75 rounded-xl pointer-events-none"></span>
-                      <span className="relative flex items-center gap-2 z-10">
-                        Extract Tasks <Send size={16} className="text-white opacity-90 transition-all duration-200 ease-in-out group-hover:text-white" />
-                      </span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Status Overlay */}
-                {jobId && isProcessing && (
-                  <div className="bg-slate-50/80 border-t border-slate-100 p-6">
-                    <TaskStatus jobId={jobId} onComplete={handleJobComplete} />
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Input History - Recent Activity */}
-            {isManager && notes.length > 0 && (
-              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xl font-bold text-slate-800 flex items-center gap-3">
-                    <Activity size={20} className="text-blue-600" />
-                    Recent Activity
-                  </h3>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{notes.length} Inputs Total</span>
-                </div>
-                
-                <div className="bg-white rounded-[24px] border border-slate-200/60 shadow-sm overflow-hidden transition-all hover:shadow-md">
-                  <div className="max-h-[320px] overflow-y-auto custom-scrollbar">
-                    <div className="p-2 space-y-2">
-                      {notes.map((note) => (
-                        (() => {
-                          const isExpanded = expandedNoteIds.includes(note.id);
-
-                          return (
-                        <div 
-                          key={note.id} 
-                          className={`rounded-xl border-l-4 transition-all group ${selectedNoteId === note.id ? 'bg-blue-50/60 border-blue-500' : 'border-transparent hover:bg-slate-50'}`}
-                        >
-                          <button
-                            onClick={() => {
-                              fetchNoteData(note.id);
-                              toggleNoteExpansion(note.id);
-                            }}
-                            className="w-full p-4 text-left flex items-start justify-between gap-3"
-                          >
-                            <div className="flex-1 min-w-0 pr-2">
-                              <p className="text-sm font-semibold text-slate-700 truncate group-hover:text-blue-700 transition-colors">
-                                {note.raw_text}
-                              </p>
-                              <p className="text-[10px] text-slate-400 font-bold uppercase mt-1 flex items-center gap-2">
-                                {new Date(note.created_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                              </p>
-                            </div>
-
-                            <div className="flex items-center gap-3 flex-shrink-0">
-                              <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider ${
-                                note.status === 'processed' ? 'bg-emerald-100 text-emerald-700' :
-                                note.status === 'pending' ? 'bg-amber-100 text-amber-700 animate-pulse' :
-                                'bg-rose-100 text-rose-700'
-                              }`}>
-                                {note.status}
-                              </span>
-                              <span
-                                className={`text-slate-300 transition-transform duration-300 ${isExpanded ? 'rotate-180 text-blue-500' : ''}`}
-                              >
-                                <ChevronDown size={14} />
-                              </span>
-                            </div>
-                          </button>
-
-                          <div
-                            style={{ maxHeight: isExpanded ? `${noteHeights[note.id] || 0}px` : '0px' }}
-                            className="overflow-hidden transition-[max-height] duration-300 ease-in-out"
-                          >
-                            <div
-                              ref={(el) => {
-                                noteContentRefs.current[note.id] = el;
-                              }}
-                              className="px-4 pb-4"
-                            >
-                              <div className="rounded-xl bg-white border border-slate-200 p-3">
-                                <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
-                                  {note.raw_text}
-                                </p>
-                                <div className="mt-3 pt-3 border-t border-slate-100 flex justify-end">
-                                  <button
-                                    onClick={(e) => handleNoteDelete(e, note.id)}
-                                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                                    title="Delete from history"
-                                  >
-                                    <Trash2 size={13} />
-                                    Delete
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                          );
-                        })()
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Task Board Section */}
-            <div className="space-y-6 pb-20">
-              <div className="flex justify-between items-end">
-                <div>
-                  <h3 className="text-2xl font-bold text-slate-800 tracking-tight flex items-center gap-3">
-                    {isManager ? 'Workspace Kanban' : 'My Tasks'}
-                  </h3>
-                  <p className="text-slate-500 text-sm font-medium mt-1">
-                    {isManager ? 'Viewing all tasks across the organization.' : `Viewing tasks assigned to ${currentUser.username}.`}
-                  </p>
-                </div>
-
-                {isManager && (
-                  <button
-                    onClick={() => {
-                      if (!hasPipelineTrace) return;
-                      setShowTrace(!showTrace);
-                    }}
-                    disabled={!hasPipelineTrace}
-                    className={`h-10 px-4 rounded-xl font-bold text-xs uppercase tracking-widest flex items-center gap-2 transition-all border ${
-                      !hasPipelineTrace
-                      ? 'bg-slate-100 text-slate-300 border-slate-200 cursor-not-allowed'
-                      : showTrace 
-                      ? 'bg-slate-800 text-white border-slate-800 shadow-lg' 
-                      : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300 hover:text-blue-600'
-                    }`}
-                  >
-                    <Activity size={16} />
-                    {showTrace ? 'Hide Trace' : 'View Pipeline Trace'}
-                  </button>
-                )}
-              </div>
-
-              {/* Pipeline Trace Collapsible - Styled */}
-              {showTrace && pipelineTrace && (
-                <div className="bg-slate-900 rounded-[20px] p-6 overflow-hidden shadow-2xl border border-slate-800 animate-in slide-in-from-top-4 duration-300">
-                  <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
-                    <span className="text-blue-400 font-mono text-xs font-bold uppercase tracking-wider">Debug: Internal Pipeline Trace</span>
-                    <span className="text-slate-600 text-[10px] font-mono">v1.2.0-MVP</span>
-                  </div>
-                  <div className="overflow-x-auto max-h-[400px] custom-scrollbar">
-                    <pre className="text-emerald-400/90 font-mono text-sm leading-relaxed p-2">
-                       {JSON.stringify(pipelineTrace, null, 2)}
-                    </pre>
-                  </div>
-                </div>
-              )}
-
-              <div className="mt-8 transition-all">
-                <KanbanBoard
-                  tasks={tasks}
-                  users={users}
-                  currentUser={currentUser}
-                  onTaskUpdate={handleTaskUpdate}
-                  onTaskDelete={handleTaskDelete}
-                  onOpenChat={(memberId) => {
-                    setPreferredChatMemberId(memberId);
-                    setActiveView('chat');
-                  }}
-                />
-              </div>
-            </div>
-
-          </div>
-        </main>
+  return (
+    <div
+      id="hero-mockup"
+      ref={mockupRef}
+      className={`reveal-item mt-50 transition-all duration-700 ${
+        isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
+      }`}
+      style={{ "--delay": "280ms" }}
+    >
+      <div className="hero-showcase-shell">
+        <video
+          ref={videoRef}
+          src={HERO_VIDEO_SRC}
+          muted
+          loop
+          playsInline
+          preload="metadata"
+          className={`hero-video-card w-full rounded-[24px] object-cover transition-all duration-1000 ease-out ${
+            isVisible ? "opacity-100 blur-0 scale-100" : "opacity-0 blur-xl scale-[1.03]"
+          }`}
+        />
+        <div className="hero-showcase-vignette" aria-hidden="true" />
       </div>
     </div>
   );
 }
 
-// ─── Helper Components ──────────────────────────────────────────────
+function WorkflowSection() {
+  const [timelineRef, timelineVisible] = useInView(0.3);
 
-function SidebarLink({ icon, label, active = false, soon = false, onClick }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all group ${
-        active 
-        ? 'bg-blue-50 text-blue-700 font-bold shadow-sm' 
-        : soon 
-          ? 'text-slate-400 cursor-not-allowed grayscale' 
-          : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 font-medium'
-      }`}
-    >
-      <span className={`${active ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600'}`}>
-        {icon}
-      </span>
-      <span className="text-[14px]">{label}</span>
-      {soon && (
-        <span className="text-[9px] font-black bg-slate-100 text-slate-400 px-1.5 py-0.5 rounded-md ml-auto mt-0.5 tracking-tighter">SOON</span>
-      )}
-    </button>
+    <RevealSection id="workflow" className="mx-auto max-w-6xl px-4 py-24 md:px-8">
+      <div className="reveal-item" style={{ "--delay": "0ms" }}>
+        <Pill>Workflow</Pill>
+      </div>
+      <h2
+        className="reveal-item mt-4 max-w-3xl text-4xl font-extrabold tracking-tight text-slate-900 md:text-5xl"
+        style={{ "--delay": "90ms" }}
+      >
+        From conversation to execution
+        <br />
+        in four steps.
+      </h2>
+
+      <div ref={timelineRef} className="relative mt-14">
+        <div className="absolute left-4 top-2 h-[calc(100%-16px)] w-px bg-slate-200 md:hidden" />
+        <div
+          className="absolute left-4 top-2 w-px bg-[#2563EB] transition-all duration-[800ms] ease-out md:hidden"
+          style={{ height: timelineVisible ? "calc(100% - 16px)" : "0px" }}
+        />
+
+        <div className="absolute left-2 right-2 top-5 hidden h-px bg-slate-200 md:block" />
+        <div
+          className="absolute left-2 top-5 hidden h-px bg-[#2563EB] transition-all duration-[800ms] ease-out md:block"
+          style={{ width: timelineVisible ? "calc(100% - 16px)" : "0px" }}
+        />
+
+        <div className="grid gap-6 md:grid-cols-4 md:gap-4">
+          {workflowSteps.map((step, index) => {
+            const Icon = step.icon;
+            return (
+              <article
+                key={step.title}
+                className={`relative rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_12px_30px_-24px_rgba(15,23,42,0.35)] transition-all duration-500 ${
+                  timelineVisible ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"
+                }`}
+                style={{ transitionDelay: timelineVisible ? `${360 + index * 120}ms` : "0ms" }}
+              >
+                <span className="absolute -left-[21px] top-6 hidden h-4 w-4 rounded-full border-2 border-[#2563EB] bg-white md:block" />
+                <span className="absolute left-[-6px] top-6 h-3 w-3 rounded-full border-2 border-[#2563EB] bg-white md:hidden" />
+
+                <div className="mb-3 inline-flex items-center gap-2 rounded-xl bg-blue-50 px-3 py-2 text-[#2563EB]">
+                  {Icon === "dual" ? (
+                    <>
+                      <Mic size={16} />
+                      <FileText size={16} />
+                    </>
+                  ) : (
+                    <Icon size={17} />
+                  )}
+                </div>
+                <h3 className="text-lg font-semibold text-slate-900">{step.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-slate-600">{step.description}</p>
+              </article>
+            );
+          })}
+        </div>
+      </div>
+    </RevealSection>
   );
 }
 
-// ─── Audio Recorder Button ──────────────────────────────────────────
-function AudioRecorderButton({ onStarted, disabled, currentUserId }) {
-  const [isRecording, setIsRecording] = React.useState(false);
-  const mediaRecorderRef = React.useRef(null);
-  const audioChunksRef = React.useRef([]);
+export default function App() {
+  const [showManagerDashboard, setShowManagerDashboard] = useState(false);
 
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorderRef.current = new MediaRecorder(stream);
-
-      mediaRecorderRef.current.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        }
-      };
-
-      mediaRecorderRef.current.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        audioChunksRef.current = [];
-        await uploadAudio(audioBlob);
-      };
-
-      mediaRecorderRef.current.start();
-      setIsRecording(true);
-    } catch (err) {
-      console.error("Error accessing microphone", err);
-    }
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
-    }
-  };
-
-  const uploadAudio = async (blob) => {
-    const formData = new FormData();
-    formData.append('user_id', currentUserId.toString());
-    formData.append('file', blob, 'recording.webm');
-
-    try {
-      const response = await axios.post(`${API_URL}/process-input`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      if (response.data) {
-        onStarted(response.data);
-      }
-    } catch (err) {
-      console.error("Error uploading audio", err);
-    }
-  };
+  if (showManagerDashboard) {
+    return <ManagerDashboard onBackToLanding={() => setShowManagerDashboard(false)} />;
+  }
 
   return (
-    <button
-      id="audio-record-btn"
-      onClick={isRecording ? stopRecording : startRecording}
-      disabled={disabled && !isRecording}
-      className={`group h-12 sm:h-13 min-w-[170px] px-6 rounded-xl font-semibold text-sm tracking-wide transition-all duration-200 ease-in-out inline-flex items-center justify-center gap-2.5 border focus-visible:outline-none focus-visible:ring-2 ${
-        isRecording
-        ? 'bg-blue-100 text-blue-700 border-[#3B82F6] hover:bg-blue-200/80 hover:text-blue-800 shadow-[0_0_14px_rgba(59,130,246,0.22)] focus-visible:ring-blue-300/60'
-        : 'bg-white/80 text-[#3B82F6] border-[rgba(59,130,246,0.5)] hover:bg-[rgba(59,130,246,0.08)] hover:border-[#3B82F6] hover:text-[#2563EB] shadow-[0_4px_12px_rgba(59,130,246,0.08)] hover:shadow-[0_0_10px_rgba(59,130,246,0.18)] focus-visible:ring-blue-300/60'
-      } disabled:bg-slate-200/80 disabled:text-slate-400 disabled:border-slate-300 disabled:shadow-none disabled:cursor-not-allowed`}
-    >
-      <div className={`w-2.5 h-2.5 rounded-full ${isRecording ? 'bg-blue-600 animate-pulse' : 'bg-[#3B82F6] opacity-80 group-hover:opacity-100'}`}></div>
-      {isRecording ? 'Stop Recording' : 'Record Audio'}
-      <Mic size={18} className={isRecording ? 'text-blue-700' : 'text-[#3B82F6] opacity-80 transition-all duration-200 ease-in-out group-hover:opacity-100'} />
-    </button>
+    <div className="min-h-screen bg-[#F5F7FA] text-slate-900">
+      <div className="page-atmosphere pointer-events-none fixed inset-0 -z-10" />
+
+      <header className="sticky top-0 z-50 border-b border-slate-200/70 bg-white/70 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 md:px-8">
+          <a href="#top" className="inline-flex items-center gap-2 text-lg font-bold tracking-tight text-slate-900">
+            <Sparkles size={16} className="text-[#2563EB]" />
+            Cartana
+          </a>
+          <nav className="hidden items-center gap-7 text-sm text-slate-500 md:flex">
+            <a href="#problem" className="transition hover:text-slate-800">
+              Problem
+            </a>
+            <a href="#workflow" className="transition hover:text-slate-800">
+              Workflow
+            </a>
+            <a href="#features" className="transition hover:text-slate-800">
+              Features
+            </a>
+            <a href="#architecture" className="transition hover:text-slate-800">
+              Architecture
+            </a>
+          </nav>
+          <div className="flex items-center gap-2">
+            <a
+              href={DEMO_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-xl bg-[#2563EB] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#3B82F6]"
+            >
+              Watch Demo
+            </a>
+            <a
+              href="https://github.com/"
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-white"
+            >
+              GitHub
+            </a>
+          </div>
+        </div>
+      </header>
+
+      <main id="top" className="overflow-x-hidden">
+        <section className="hero-dot-grid relative mx-auto mt-4 max-w-6xl overflow-hidden rounded-[36px] px-4 pb-16 pt-16 md:px-8 md:pt-20">
+          <div className="float-card float-delay-0 absolute left-4 top-8 hidden w-[240px] -rotate-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-xl lg:block">
+            <p className="text-sm font-semibold text-slate-900">🎙️ Voice Note - 2 min ago</p>
+            <p className="mt-2 text-xs leading-relaxed text-slate-600">
+              Priya should finalize the API docs before Thursday&apos;s sprint review
+            </p>
+            <span className="mt-3 inline-flex items-center rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-700 ring-1 ring-amber-200">
+              ● Processing...
+            </span>
+          </div>
+
+          <div className="float-card float-delay-1 absolute right-4 top-10 hidden w-[280px] rotate-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-xl lg:block">
+            <p className="text-sm font-semibold text-slate-900">✅ 3 Tasks Extracted</p>
+            <div className="mt-3 space-y-2">
+              <span className="block rounded-full bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700">API Docs - Priya - Thu</span>
+              <span className="block rounded-full bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700">Design Review - Rahul - Fri</span>
+              <span className="block rounded-full bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700">Client Demo - Sarah - Mon</span>
+            </div>
+          </div>
+
+          <div className="relative z-10 mx-auto flex max-w-4xl flex-col items-center text-center">
+            <Pill>Cartana AI</Pill>
+
+            <motion.h1
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0 }}
+              className="mt-8 text-[48px] font-black leading-[0.95] tracking-[-0.03em] text-[#0F172A] md:text-[72px]"
+            >
+              Speak once.
+              <span className="mt-2 block text-[#2563EB]">Ship everything.</span>
+            </motion.h1>
+
+            <motion.p
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.1 }}
+              className="mt-6 max-w-3xl text-[18px] leading-relaxed text-slate-500"
+            >
+              Cartana listens to your team meetings, extracts action items, assigns ownership, and
+              pushes everything to your Kanban board - without anyone typing a single task.
+            </motion.p>
+
+            <motion.div
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+              className="mt-8"
+            >
+              <CTAs className="justify-center" large />
+            </motion.div>
+
+            <HeroMockup />
+
+            <div className="float-card float-delay-2 mt-5 hidden self-end rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-xl lg:block">
+              <p className="text-sm font-semibold text-slate-900">INGESTION ✓ → EXTRACTION ✓ → REVIEW ⚠</p>
+              <p className="mt-2 text-xs text-slate-500">1 task flagged for review</p>
+            </div>
+          </div>
+        </section>
+
+        <RevealSection id="problem" className="mx-auto max-w-6xl px-4 py-24 md:px-8">
+          <div className="reveal-item" style={{ "--delay": "0ms" }}>
+            <Pill>The Problem</Pill>
+          </div>
+          <h2
+            className="reveal-item mt-4 max-w-3xl text-4xl font-extrabold tracking-tight text-slate-900 md:text-5xl"
+            style={{ "--delay": "90ms" }}
+          >
+            Meetings generate intent.
+            <br />
+            Not execution.
+          </h2>
+
+          <div className="mt-10 grid gap-4 md:grid-cols-3">
+            {problemCards.map((card, index) => {
+              const Icon = card.icon;
+              return (
+                <article
+                  key={card.title}
+                  className="reveal-item rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_16px_35px_-30px_rgba(15,23,42,0.5)]"
+                  style={{ "--delay": `${160 + index * 90}ms` }}
+                >
+                  <div className="inline-flex rounded-xl bg-blue-50 p-2.5 text-[#2563EB]">
+                    <Icon size={18} />
+                  </div>
+                  <h3 className="mt-4 text-lg font-semibold text-slate-900">{card.title}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-slate-600">{card.description}</p>
+                </article>
+              );
+            })}
+          </div>
+        </RevealSection>
+
+        <WorkflowSection />
+
+        <RevealSection id="features" className="mx-auto max-w-6xl px-4 py-24 md:px-8">
+          <div className="reveal-item" style={{ "--delay": "0ms" }}>
+            <Pill>Features</Pill>
+          </div>
+          <h2
+            className="reveal-item mt-4 max-w-4xl text-4xl font-extrabold tracking-tight text-slate-900 md:text-5xl"
+            style={{ "--delay": "90ms" }}
+          >
+            Everything your team needs
+            <br />
+            to go from discussion to delivery.
+          </h2>
+
+          <div className="mt-12 grid auto-rows-[minmax(190px,_auto)] grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+            <article
+              className="bento-card reveal-item rounded-3xl border border-slate-200 bg-white p-6 xl:col-span-2"
+              style={{ "--delay": "160ms" }}
+            >
+              <div className="inline-flex rounded-xl bg-blue-50 p-2.5 text-[#2563EB]">
+                <Mic size={18} />
+              </div>
+              <h3 className="mt-4 text-xl font-semibold text-slate-900">Voice-to-Task Conversion</h3>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                Upload or record audio. Whisper transcribes it. The LLM extracts tasks. You get a
+                structured board - without typing a single task manually.
+              </p>
+              <div className="mt-5 flex h-12 items-end gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2">
+                {Array.from({ length: 18 }).map((_, i) => (
+                  <span
+                    key={i}
+                    className="wave-bar"
+                    style={{
+                      animationDelay: `${i * 70}ms`,
+                      height: `${18 + ((i * 7) % 22)}px`,
+                    }}
+                  />
+                ))}
+              </div>
+            </article>
+
+            <article className="bento-card reveal-item rounded-3xl border border-slate-200 bg-white p-6" style={{ "--delay": "230ms" }}>
+              <div className="inline-flex rounded-xl bg-amber-50 p-2.5 text-amber-600">
+                <ShieldAlert size={18} />
+              </div>
+              <h3 className="mt-4 text-lg font-semibold text-slate-900">Confidence-Aware Review Gate</h3>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                Uncertain extractions are never blindly pushed. They are routed to NEEDS_REVIEW,
+                keeping you in control of automation.
+              </p>
+              <span className="mt-4 inline-flex rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700 ring-1 ring-amber-200">
+                ⚠ Confidence: 67%
+              </span>
+            </article>
+
+            <article className="bento-card reveal-item rounded-3xl border border-slate-200 bg-white p-6" style={{ "--delay": "300ms" }}>
+              <div className="inline-flex rounded-xl bg-blue-50 p-2.5 text-[#2563EB]">
+                <Layers size={18} />
+              </div>
+              <h3 className="mt-4 text-lg font-semibold text-slate-900">Typed Schema Extraction</h3>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                LLM output is validated against strict types - no freeform blobs. Every task has a
+                title, assignee, priority, and deadline.
+              </p>
+            </article>
+
+            <article className="bento-card reveal-item rounded-3xl border border-slate-200 bg-white p-6 xl:row-span-2" style={{ "--delay": "370ms" }}>
+              <div className="inline-flex rounded-xl bg-blue-50 p-2.5 text-[#2563EB]">
+                <Activity size={18} />
+              </div>
+              <h3 className="mt-4 text-lg font-semibold text-slate-900">Pipeline Trace Visibility</h3>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                Each note stores per-stage trace data. See exactly where extraction succeeded, where
+                confidence dropped, and why.
+              </p>
+
+              <div className="mt-6 space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                {[
+                  ["INGESTION", "ok"],
+                  ["EXTRACTION", "ok"],
+                  ["VALIDATION", "ok"],
+                  ["REVIEW", "warn"],
+                ].map(([label, state]) => (
+                  <div key={label} className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-slate-700">{label}</span>
+                    <span className="inline-flex items-center gap-2 text-slate-500">
+                      <span
+                        className={`h-2.5 w-2.5 rounded-full ${
+                          state === "warn" ? "bg-amber-500" : "bg-emerald-500"
+                        }`}
+                      />
+                      {state === "warn" ? "Attention" : "Passed"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </article>
+
+            <article className="bento-card reveal-item rounded-3xl border border-slate-200 bg-white p-6" style={{ "--delay": "440ms" }}>
+              <div className="inline-flex rounded-xl bg-blue-50 p-2.5 text-[#2563EB]">
+                <Zap size={18} />
+              </div>
+              <h3 className="mt-4 text-lg font-semibold text-slate-900">Async Processing with Retries</h3>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                Celery + Redis queue ensures tasks are processed reliably. Transient failures retry
+                with exponential backoff.
+              </p>
+            </article>
+
+            <article className="bento-card reveal-item rounded-3xl border border-slate-200 bg-white p-6" style={{ "--delay": "510ms" }}>
+              <div className="inline-flex rounded-xl bg-blue-50 p-2.5 text-[#2563EB]">
+                <MessageSquare size={18} />
+              </div>
+              <h3 className="mt-4 text-lg font-semibold text-slate-900">Real-Time Team Chat</h3>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                Manager-member channels tied to workspaces. Task context stays in the same place as
+                execution - via WebSockets.
+              </p>
+            </article>
+          </div>
+        </RevealSection>
+
+        <RevealSection id="architecture" className="mx-auto max-w-6xl px-4 py-24 md:px-8">
+          <div className="reveal-item" style={{ "--delay": "0ms" }}>
+            <Pill>Built With</Pill>
+          </div>
+          <h2
+            className="reveal-item mt-4 max-w-4xl text-4xl font-extrabold tracking-tight text-slate-900 md:text-5xl"
+            style={{ "--delay": "90ms" }}
+          >
+            A production-grade architecture
+            <br />
+            under the hood.
+          </h2>
+
+          <div className="mt-10 grid gap-6 lg:grid-cols-2">
+            <div className="reveal-item rounded-3xl border border-slate-200 bg-white p-6" style={{ "--delay": "180ms" }}>
+              <h3 className="text-lg font-semibold text-slate-900">Stack Composition</h3>
+              <div className="mt-5 space-y-4">
+                {stackGroups.map((group) => (
+                  <div key={group.label}>
+                    <p className="mb-2 text-sm font-semibold text-slate-500">{group.label}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {group.items.map((item) => (
+                        <span
+                          key={item}
+                          className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700"
+                        >
+                          <span className="h-1.5 w-1.5 rounded-full bg-[#2563EB]" />
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <article className="reveal-item rounded-2xl border border-slate-200 bg-white p-5" style={{ "--delay": "250ms" }}>
+                <div className="inline-flex items-center gap-2 rounded-lg bg-blue-50 px-2.5 py-1.5 text-sm font-semibold text-[#2563EB]">
+                  <RefreshCw size={15} />
+                  Async by Design
+                </div>
+                <p className="mt-3 text-sm leading-relaxed text-slate-600">
+                  Celery workers decouple AI processing from the request cycle, enabling
+                  non-blocking task extraction at scale.
+                </p>
+              </article>
+
+              <article className="reveal-item rounded-2xl border border-slate-200 bg-white p-5" style={{ "--delay": "330ms" }}>
+                <div className="inline-flex items-center gap-2 rounded-lg bg-blue-50 px-2.5 py-1.5 text-sm font-semibold text-[#2563EB]">
+                  <BrainCircuit size={15} />
+                  LLM with Guardrails
+                </div>
+                <p className="mt-3 text-sm leading-relaxed text-slate-600">
+                  Function-calling extraction enforces a typed output schema. Ambiguous results are
+                  flagged, not guessed.
+                </p>
+              </article>
+
+              <article className="reveal-item rounded-2xl border border-slate-200 bg-white p-5" style={{ "--delay": "410ms" }}>
+                <div className="inline-flex items-center gap-2 rounded-lg bg-blue-50 px-2.5 py-1.5 text-sm font-semibold text-[#2563EB]">
+                  <Radio size={15} />
+                  Real-Time Updates
+                </div>
+                <p className="mt-3 text-sm leading-relaxed text-slate-600">
+                  WebSocket channels push task state changes instantly to connected clients without
+                  polling.
+                </p>
+              </article>
+            </div>
+          </div>
+        </RevealSection>
+
+        <RevealSection id="footer-cta" className="mt-20 bg-[#0F172A] px-4 py-20 md:px-8">
+          <div className="mx-auto max-w-6xl">
+            <h2 className="reveal-item text-4xl font-extrabold tracking-tight text-white md:text-5xl" style={{ "--delay": "0ms" }}>
+              See Cartana in action.
+            </h2>
+            <p className="reveal-item mt-4 max-w-3xl text-lg leading-relaxed text-slate-300" style={{ "--delay": "90ms" }}>
+              Built as a full-stack AI project - explore the code or watch the walkthrough.
+            </p>
+            <div className="reveal-item mt-8" style={{ "--delay": "170ms" }}>
+              <CTAs dark />
+            </div>
+            <p className="reveal-item mt-8 text-sm text-slate-400" style={{ "--delay": "240ms" }}>
+              ⚡ Built with FastAPI · React · Celery · LLM APIs - Placement Project by Shubh, 2025
+            </p>
+          </div>
+        </RevealSection>
+      </main>
+    </div>
   );
 }

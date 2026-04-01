@@ -33,4 +33,5 @@ celerybeat.pid
 .DS_Store
 Thumbs.db
 readmeonboard.md
+readmefront.md
 

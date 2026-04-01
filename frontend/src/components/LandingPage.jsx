@@ -2,6 +2,17 @@ import React from 'react';
 import { Clock, CheckSquare, Layers, Zap, MoreHorizontal, MessageSquare, Play } from 'lucide-react';
 
 export default function LandingPage({ onEnterApp }) {
+  const showcaseFrames = [
+    'Screenshot 2026-04-01 164401.png',
+    'Screenshot 2026-04-01 180657.png',
+    'Screenshot 2026-04-01 180711.png',
+    'Screenshot 2026-04-01 180729.png',
+    'Screenshot 2026-04-01 180747.png',
+    'Screenshot 2026-04-01 180816.png',
+    'Screenshot 2026-04-01 180826.png',
+    'Screenshot 2026-04-01 180849.png',
+  ].map((fileName) => `/assets/${encodeURIComponent(fileName)}`);
+
   const handleTryCartana = () => {
     onEnterApp?.();
   };
@@ -179,6 +190,21 @@ export default function LandingPage({ onEnterApp }) {
             </span>
             <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
           </button>
+
+          <div className="hero-showcase-shell mt-12 md:mt-14 w-full max-w-5xl">
+            <div className="hero-showcase-frame">
+              {showcaseFrames.map((frame, index) => (
+                <img
+                  key={frame}
+                  src={frame}
+                  alt={`Cartana product screenshot ${index + 1}`}
+                  className="hero-showcase-slide"
+                  style={{ '--frame-delay': `${index * 4}s` }}
+                />
+              ))}
+              <div className="hero-showcase-vignette" aria-hidden="true" />
+            </div>
+          </div>
         </div>
       </main>
     </div>
