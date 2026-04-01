@@ -320,7 +320,7 @@ export default function App() {
               Watch Demo
             </a>
             <a
-              href="https://github.com/"
+              href="https://github.com/shubgit07"
               target="_blank"
               rel="noreferrer"
               className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-white"
